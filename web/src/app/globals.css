@@ -6,6 +6,7 @@
 :root {
   /* Dalan color palette */
   --dalan-yellow: #FFF3B0;
+  --dalan-pastel-yellow: #FFFADF; /* Lighter pastel yellow for step indicators */
   --dalan-gray: #CFCFD1;
   --dalan-white: #ffffff;
   --dalan-black: #000000;

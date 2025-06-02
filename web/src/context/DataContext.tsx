@@ -31,7 +31,7 @@ const sampleEntries: RoadCrackEntry[] = [
     date: '2025-05-28T08:30:00Z',
     severity: 'major',
     type: 'alligator', // AI determined
-    image: '/cracks/crack1.jpg',
+    image: '/placeholders/ex1.png',
     user: {
       id: 'user1',
       name: 'Matthew Enarle',
@@ -46,8 +46,8 @@ const sampleEntries: RoadCrackEntry[] = [
     coordinates: [121.0244, 14.6091], // Quezon City
     date: '2025-05-27T14:15:00Z',
     severity: 'minor',
-    type: 'longitudinal', // AI determined
-    image: '/cracks/crack2.jpg',
+    type: 'longitudinal', 
+    image: '/placeholders/ex1.png',
     user: {
       id: 'user2',
       name: 'Alecxander Andaya',
@@ -63,7 +63,7 @@ const sampleEntries: RoadCrackEntry[] = [
     date: '2025-05-26T10:45:00Z',
     severity: 'major',
     type: 'transverse', // AI determined
-    image: '/cracks/crack3.jpg',
+    image: '/placeholders/ex1.png', // Using the provided mock image
     user: {
       id: 'user3',
       name: 'Juan Dela Cruz',
@@ -79,7 +79,7 @@ const sampleEntries: RoadCrackEntry[] = [
     date: '2025-05-25T16:20:00Z',
     severity: 'minor',
     type: 'alligator', // AI determined
-    image: '/cracks/crack4.jpg',
+    image: '/placeholders/ex1.png',
     user: {
       id: 'user1',
       name: 'Matthew Enarle',
@@ -95,7 +95,7 @@ const sampleEntries: RoadCrackEntry[] = [
     date: '2025-05-24T09:10:00Z',
     severity: 'major',
     type: 'longitudinal', // AI determined
-    image: '/cracks/crack5.jpg',
+    image: '/placeholders/ex1.png',
     user: {
       id: 'user2',
       name: 'Alecxander Andaya',
@@ -111,7 +111,7 @@ const sampleEntries: RoadCrackEntry[] = [
     date: '2025-05-23T11:30:00Z',
     severity: 'minor',
     type: 'transverse', // AI determined
-    image: '/cracks/crack6.jpg',
+    image: '/placeholders/ex1.png',
     user: {
       id: 'user3',
       name: 'Juan Dela Cruz',

@@ -11,13 +11,17 @@ interface MapProps {
     position: [number, number]; // [lng, lat]
     popup?: string;
   }>;
+  onMapClick?: (coordinates: [number, number]) => void;
+  interactive?: boolean;
 }
 
 // Component that loads and displays a Mapbox map
 export default function Map({ 
   initialCenter = [120.9842, 14.5995], // Manila coordinates [longitude, latitude]
   zoom = 13,
-  markers = []
+  markers = [],
+  onMapClick,
+  interactive = true
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<MapboxMap | null>(null);
@@ -71,6 +75,17 @@ export default function Map({
           
           // Add navigation controls
           map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+          
+          // Add click event handler if interactive and onMapClick is provided
+          if (interactive && onMapClick) {
+            map.on('click', (e) => {
+              const { lng, lat } = e.lngLat;
+              onMapClick([lng, lat]);
+            });
+            
+            // Change cursor to pointer when hovering over map
+            map.getCanvas().style.cursor = 'pointer';
+          }
         }
       } catch (error) {
         console.error('Error initializing Mapbox map:', error);

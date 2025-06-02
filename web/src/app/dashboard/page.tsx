@@ -182,7 +182,7 @@ export default function Dashboard() {
         </button>
       </div>
       
-      {/* Entries Feed */}
+      {/* Entries Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredEntries.map(entry => (
           <div key={entry.id} className="bg-card rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col h-full">
@@ -190,10 +190,17 @@ export default function Dashboard() {
             <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-2 flex-shrink-0">
-                  {/* This would be replaced with actual avatar images */}
-                  <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400">
-                    {entry.user.name.charAt(0)}
-                  </div>
+                  {entry.user.name === 'Matthew Enarle' ? (
+                    <img 
+                      src="/placeholders/matt.png" 
+                      alt="Matthew Enarle" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400">
+                      {entry.user.name.charAt(0)}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm font-medium">{entry.user.name}</p>
@@ -209,36 +216,31 @@ export default function Dashboard() {
             </div>
             
             {/* Image with Map Overlay */}
-            <div className="relative h-48 w-full bg-gray-100 dark:bg-gray-800">
-              {/* Image placeholder */}
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                {/* Replace with actual images when available */}
-                <span className="text-xs">Road Crack Image</span>
-              </div>
+            <div className="relative h-48 w-full overflow-hidden">
+              {/* Actual image */}
+              <img 
+                src={entry.image} 
+                alt={entry.title}
+                className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+              />
               
-              {/* Map Preview Overlay */}
-              <div className="absolute top-2 right-2 z-10 w-16 h-16 rounded-md overflow-hidden border-2 border-white shadow-md">
-                <Link 
-                  href={`/map?lat=${entry.coordinates[1]}&lng=${entry.coordinates[0]}&id=${entry.id}`}
-                  className="block w-full h-full relative"
-                  aria-label="View on map"
-                >
-                  <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <div className="w-4 h-4 rounded-full bg-dalan-yellow border-2 border-white relative">
-                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-0.5 h-3 bg-white"></div>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] p-0.5 text-center">
-                    View Map
-                  </div>
-                </Link>
-              </div>
+              {/* Map Button */}
+              <Link 
+                href={`/map?lat=${entry.coordinates[1]}&lng=${entry.coordinates[0]}&id=${entry.id}`}
+                className="absolute top-3 right-3 z-10 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 shadow-md hover:scale-105 transition-all flex items-center justify-center"
+                aria-label="View on map"
+              >
+                <MapIcon size={16} />
+              </Link>
               
               {/* Severity Badge */}
               <div className="absolute top-2 left-2 z-10 bg-black/70 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center">
                 <AlertTriangle size={12} className="mr-1" />
-                {entry.severity}
+                <span className="capitalize">{entry.severity}</span>
               </div>
+              
+              {/* Gradient overlay for better text visibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
             </div>
             
             {/* Content */}
@@ -262,9 +264,10 @@ export default function Dashboard() {
             <div className="p-3 border-t border-gray-200 dark:border-gray-800">
               <Link 
                 href={`/details/${entry.id}`}
-                className="text-xs font-medium text-dalan-yellow hover:underline"
+                className="text-xs font-medium text-dalan-yellow hover:underline flex items-center"
               >
                 View Details
+                <ChevronDown size={14} className="ml-1 transform rotate-270" />
               </Link>
             </div>
           </div>

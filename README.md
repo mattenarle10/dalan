@@ -11,11 +11,15 @@
 
 - 📸 Upload road crack images (with optional GPS tagging)
 - 🤖 AI-powered image classification (e.g., alligator, longitudinal, transverse)
+- Severity classification (e.g., minor, major)
 - 🗺️ Interactive map view with markers for each crack report
 - 📊 Filter results by type, location, and date
+- 📱 Feed view with filtering
 - 🧠 Model training and deployment pipeline (MobileNet/ResNet)
 - 🧑‍🤝‍🧑 Crowdsourced — open to everyone
 - 🔐 Optional authentication (Google, etc.)
+- 📱 Mobile-first design 
+
 
 ---
 
@@ -24,7 +28,7 @@
 ```
 /dalan
   /web     # Next.js + Tailwind CSS frontend
-  /api     # Backend (Node.js/Express, or FastAPI if you prefer Python)
+  /api     # FastAPI backend + Supabase DB / Cloudinary for images
   /model   # Jupyter Notebooks/scripts for AI model training
   README.md
 ```
@@ -35,11 +39,11 @@
 
 ### 1. Frontend (`/web`)
 - Next.js + Tailwind CSS
-- Pages: Image upload, map view, submissions
+- Pages: Image upload, map view w filtering, Feed w  filtering
 
 ### 2. Backend (`/api`)
-- Node.js/Express (or FastAPI)
-- Handles image uploads, AI classification endpoints, DB
+- FastAPI
+- Handles image uploads, AI classification endpoints, DB (Supabase) - Cloudinary or S3 for Image Storage
 
 ### 3. Model (`/model`)
 - Jupyter Notebooks/scripts for training crack classifiers

@@ -60,15 +60,16 @@ export default function Navbar() {
       <nav className="md:hidden fixed bottom-0 z-50 w-full backdrop-blur-md bg-white/80 dark:bg-black/80 border-t border-gray-200 dark:border-gray-800">
         <div className="px-4">
           <div className="flex items-center justify-around h-16">
-            <Link href="/" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+            <Link href="/dashboard" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <Grid size={24} className="text-gray-700 dark:text-gray-300" />
+            </Link>
+            <Link href="/add" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <LocationPlus size={24} className="text-gray-700 dark:text-gray-300" />
             </Link>
             <Link href="/map" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
               <Map size={24} className="text-gray-700 dark:text-gray-300" />
             </Link>
-            <Link href="/location" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-              <LocationPlus size={24} className="text-gray-700 dark:text-gray-300" />
-            </Link>
+
           </div>
         </div>
       </nav>
@@ -86,15 +87,16 @@ export default function Navbar() {
             
             {/* Icons centered */}
             <div className="flex justify-center space-x-8">
-              <Link href="/" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <Link href="/dashboard" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <Grid size={24} className="text-gray-700 dark:text-gray-300" />
+              </Link>
+              <Link href="/add" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <LocationPlus size={24} className="text-gray-700 dark:text-gray-300" />
               </Link>
               <Link href="/map" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <Map size={24} className="text-gray-700 dark:text-gray-300" />
               </Link>
-              <Link href="/location" className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <LocationPlus size={24} className="text-gray-700 dark:text-gray-300" />
-              </Link>
+
             </div>
             
             {/* Theme toggle on right */}

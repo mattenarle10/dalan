@@ -18,7 +18,7 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row gap-4">
           <Link 
             href="/dashboard" 
-            className="px-6 py-3 rounded-lg bg-dalan-yellow text-black font-medium flex items-center justify-center hover:opacity-90 transition-opacity dark:hover:bg-dalan-yellow/90"
+            className="px-6 py-3 rounded-lg bg-card border border-gray-200 dark:border-white/10 text-foreground font-medium flex items-center justify-center hover:bg-card/80 transition-colors"
           >
             View Dashboard
             <ArrowRight size={18} className="ml-2" />
@@ -73,9 +73,9 @@ export default function Home() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
-                  <span className="text-xs text-foreground/50">Alligator crack image</span>
-                </div>
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
+  <img src="/placeholders/alligator.jpg" alt="Alligator crack example" className="w-full h-full object-cover rounded-t-lg" />
+</div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Alligator Cracks</h4>
                   <p className="text-sm text-foreground/70">
@@ -85,9 +85,9 @@ export default function Home() {
               </div>
               
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
-                  <span className="text-xs text-foreground/50">Longitudinal crack image</span>
-                </div>
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
+  <img src="/placeholders/longitude.jpg" alt="Longitudinal crack example" className="w-full h-full object-cover rounded-t-lg" />
+</div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Longitudinal Cracks</h4>
                   <p className="text-sm text-foreground/70">
@@ -97,9 +97,9 @@ export default function Home() {
               </div>
               
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
-                  <span className="text-xs text-foreground/50">Transverse crack image</span>
-                </div>
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
+  <img src="/placeholders/transverse.jpeg" alt="Transverse crack example" className="w-full h-full object-cover rounded-t-lg" />
+</div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Transverse Cracks</h4>
                   <p className="text-sm text-foreground/70">

@@ -73,7 +73,7 @@ export default function DetailsPage() {
         Back to Dashboard
       </button>
       
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="bg-card text-foreground rounded-lg shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden">
         {/* Image */}
         <div className="w-full h-64 md:h-80 relative">
           <img 
@@ -107,7 +107,7 @@ export default function DetailsPage() {
           </div>
           
           {/* Reporter information */}
-          <div className="flex items-center mb-6 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg">
+          <div className="flex items-center mb-6 bg-card text-foreground border border-gray-200 dark:border-white/10 p-3 rounded-lg">
             <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-3 flex-shrink-0">
               {entry.user.name === 'Matthew Enarle' ? (
                 <img 

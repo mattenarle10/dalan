@@ -18,14 +18,14 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row gap-4">
           <Link 
             href="/dashboard" 
-            className="px-6 py-3 rounded-lg bg-dalan-yellow text-black font-medium flex items-center justify-center hover:opacity-90 transition-opacity"
+            className="px-6 py-3 rounded-lg bg-dalan-yellow text-black font-medium flex items-center justify-center hover:opacity-90 transition-opacity dark:hover:bg-dalan-yellow/90"
           >
             View Dashboard
             <ArrowRight size={18} className="ml-2" />
           </Link>
           <Link 
             href="/add" 
-            className="px-6 py-3 rounded-lg bg-card border border-gray-200 dark:border-gray-800 text-foreground font-medium flex items-center justify-center hover:bg-card/80 transition-colors"
+            className="px-6 py-3 rounded-lg bg-card border border-gray-200 dark:border-white/10 text-foreground font-medium flex items-center justify-center hover:bg-card/80 transition-colors"
           >
             Add New Entry
           </Link>
@@ -73,10 +73,10 @@ export default function Home() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-gray-800 rounded-t-lg flex items-center justify-center">
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
                   <span className="text-xs text-foreground/50">Alligator crack image</span>
                 </div>
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Alligator Cracks</h4>
                   <p className="text-sm text-foreground/70">
                     Interconnected cracks forming a pattern similar to alligator skin, caused by fatigue failure from repeated traffic loading.
@@ -85,10 +85,10 @@ export default function Home() {
               </div>
               
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-gray-800 rounded-t-lg flex items-center justify-center">
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
                   <span className="text-xs text-foreground/50">Longitudinal crack image</span>
                 </div>
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Longitudinal Cracks</h4>
                   <p className="text-sm text-foreground/70">
                     Cracks that run parallel to the road's centerline, often caused by poor joint construction or temperature cycles.
@@ -97,10 +97,10 @@ export default function Home() {
               </div>
               
               <div className="flex flex-col">
-                <div className="h-40 bg-gray-200 dark:bg-gray-800 rounded-t-lg flex items-center justify-center">
+                <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg flex items-center justify-center">
                   <span className="text-xs text-foreground/50">Transverse crack image</span>
                 </div>
-                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Transverse Cracks</h4>
                   <p className="text-sm text-foreground/70">
                     Cracks that run perpendicular to the road's centerline, usually caused by thermal shrinkage or underlying cracks.
@@ -118,7 +118,7 @@ export default function Home() {
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-r from-green-50 to-transparent dark:from-green-900/10 dark:to-transparent p-6 rounded-lg border border-green-100 dark:border-green-900/20">
+              <div className="bg-gradient-to-r from-green-50 to-transparent dark:from-green-900/20 dark:to-transparent p-6 rounded-lg border border-green-100 dark:border-green-500/20">
                 <div className="flex items-center mb-3">
                   <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
                   <h4 className="font-bold text-lg">Minor Severity</h4>
@@ -128,7 +128,7 @@ export default function Home() {
                 </p>
               </div>
               
-              <div className="bg-gradient-to-r from-red-50 to-transparent dark:from-red-900/10 dark:to-transparent p-6 rounded-lg border border-red-100 dark:border-red-900/20">
+              <div className="bg-gradient-to-r from-red-50 to-transparent dark:from-red-900/20 dark:to-transparent p-6 rounded-lg border border-red-100 dark:border-red-500/20">
                 <div className="flex items-center mb-3">
                   <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
                   <h4 className="font-bold text-lg">Major Severity</h4>

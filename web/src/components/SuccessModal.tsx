@@ -28,8 +28,8 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+      <div className="!bg-background text-foreground rounded-lg shadow-lg max-w-md w-full border border-border relative overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
+        <div className="p-6"> 
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center">
               <CheckCircle className="text-green-500 mr-2" size={24} />

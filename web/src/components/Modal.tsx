@@ -40,10 +40,11 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div 
-        className="bg-background rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col"
+        className="!bg-background text-foreground rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col" 
+        style={{ backgroundColor: 'var(--background)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold">{title}</h3>
           <button 
             onClick={onClose}

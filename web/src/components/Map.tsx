@@ -10,8 +10,11 @@ interface MapProps {
   markers?: Array<{
     position: [number, number]; // [lng, lat]
     popup?: string;
+    id?: string;
+    severity?: string;
   }>;
   onMapClick?: (coordinates: [number, number]) => void;
+  onMarkerClick?: (id: string) => void;
   interactive?: boolean;
 }
 
@@ -21,6 +24,7 @@ export default function Map({
   zoom = 13,
   markers = [],
   onMapClick,
+  onMarkerClick,
   interactive = true
 }: MapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -123,15 +127,31 @@ export default function Map({
         
         if (markers.length > 0) {
           markers.forEach(marker => {
-            const markerElement = new mapboxgl.Marker()
+            // Create custom marker element with severity indicator
+            const el = document.createElement('div');
+            el.className = 'custom-marker';
+            el.style.width = '24px';
+            el.style.height = '24px';
+            el.style.backgroundImage = 'url(/map-pin.svg)';
+            el.style.backgroundSize = 'contain';
+            el.style.backgroundRepeat = 'no-repeat';
+            el.style.cursor = 'pointer';
+            
+            // Add severity indicator
+            if (marker.severity) {
+              const severityColor = marker.severity === 'major' ? '#ef4444' : '#f59e0b';
+              el.style.filter = `drop-shadow(0 0 4px ${severityColor})`;
+            }
+            
+            const markerElement = new mapboxgl.Marker(el)
               .setLngLat(marker.position)
               .addTo(map);
-              
-            if (marker.popup) {
-              markerElement.setPopup(
-                new mapboxgl.Popup({ offset: 25 })
-                  .setHTML(`<p>${marker.popup}</p>`)
-              );
+            
+            // Add click handler if onMarkerClick is provided and marker has ID
+            if (onMarkerClick && marker.id) {
+              el.addEventListener('click', () => {
+                onMarkerClick(marker.id!);
+              });
             }
           });
         } else {
@@ -139,11 +159,6 @@ export default function Map({
           const defaultMarker = new mapboxgl.Marker()
             .setLngLat(initialCenter)
             .addTo(map);
-            
-          defaultMarker.setPopup(
-            new mapboxgl.Popup({ offset: 25 })
-              .setHTML('<p>Sample road crack location</p>')
-          );
         }
       } catch (error) {
         console.error('Error adding markers:', error);

@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS road_cracks (
     severity TEXT NOT NULL CHECK (severity IN ('minor', 'major')),
     type TEXT NOT NULL, -- Determined by AI classification
     image_url TEXT NOT NULL,
+    classified_image_url TEXT,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -29,3 +30,11 @@ CREATE INDEX IF NOT EXISTS road_cracks_user_id_idx ON road_cracks(user_id);
 CREATE INDEX IF NOT EXISTS road_cracks_severity_idx ON road_cracks(severity);
 CREATE INDEX IF NOT EXISTS road_cracks_type_idx ON road_cracks(type);
 
+-- Add classified_image_url column to existing tables if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name='road_cracks' AND column_name='classified_image_url') THEN
+        ALTER TABLE road_cracks ADD COLUMN classified_image_url TEXT;
+    END IF;
+END$$;

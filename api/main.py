@@ -108,7 +108,7 @@ def get_entry(entry_id: str):
         logger.error(f"Error in get_entry: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-async def classify_image(image: str, user_id: str):
+async def classify_image(image: str, user_id: str = None):
     # """
     # Classify a road crack image
     
@@ -165,15 +165,11 @@ async def classify_image(image: str, user_id: str):
                     "label": class_name
                 })
 
-        # # Encode result image back to base64
-        # _, buffer = cv2.imencode('.jpg', img)
-        # result_base64 = base64.b64encode(buffer).decode("utf-8")
-        classified_image = save_image(img, user_id)
+        # Encode result image to jpg and save it
+        _, buffer = cv2.imencode('.jpg', img)
+        classified_image_url = save_image(buffer.tobytes(), user_id)
 
-        return JSONResponse(content={
-            "result_image": classified_image,
-            "detections": detections
-        })
+        return classified_image_url
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -209,9 +205,8 @@ async def create_entry(
         # Save the image and get URL
         image_url = save_image(image_data, user_id)
 
-        classify_image(image_url, user_id)
-
-        classified_image_url = await classify_image(image_url)
+        # Classify the image and get the URL with bounding boxes
+        classified_image_url = await classify_image(image_url, user_id)
         
         # Parse coordinates from JSON string
         coords = json.loads(coordinates)

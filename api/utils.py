@@ -100,6 +100,7 @@ def format_entry_response(entry, user):
             "severity": entry["severity"],
             "type": entry["type"],
             "image": entry["image_url"],
+            "classified_image": entry.get("classified_image_url"),
             "user": {
                 "id": user["id"],
                 "name": user["name"],

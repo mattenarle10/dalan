@@ -22,6 +22,8 @@ class RoadCrackBase(BaseModel):
     coordinates: List[float]  # [longitude, latitude]
     severity: Literal["minor", "major"]
     image: str  # URL to image
+    classified_image_url: Optional[str] = None  # URL to classified image with bounding boxes
+
 
 class RoadCrackCreate(RoadCrackBase):
     """Model for creating a new road crack entry"""

@@ -38,3 +38,30 @@ BEGIN
         ALTER TABLE road_cracks ADD COLUMN classified_image_url TEXT;
     END IF;
 END$$;
+
+-- Crack Detections Table (stores individual crack detections)
+CREATE TABLE IF NOT EXISTS crack_detections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    road_crack_id UUID NOT NULL REFERENCES road_cracks(id) ON DELETE CASCADE,
+    crack_type TEXT NOT NULL,
+    confidence FLOAT NOT NULL,
+    x1 INTEGER NOT NULL,
+    y1 INTEGER NOT NULL,
+    x2 INTEGER NOT NULL,
+    y2 INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Detection Summary Table (stores summary of detections for each road crack)
+CREATE TABLE IF NOT EXISTS detection_summaries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    road_crack_id UUID NOT NULL REFERENCES road_cracks(id) ON DELETE CASCADE UNIQUE,
+    total_cracks INTEGER NOT NULL,
+    crack_types JSONB NOT NULL, -- Stores the summary of crack types, counts, and confidences
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS crack_detections_road_crack_id_idx ON crack_detections(road_crack_id);
+CREATE INDEX IF NOT EXISTS crack_detections_crack_type_idx ON crack_detections(crack_type);
+CREATE INDEX IF NOT EXISTS detection_summaries_road_crack_id_idx ON detection_summaries(road_crack_id);

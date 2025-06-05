@@ -28,7 +28,19 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-model = YOLO("../model/YOLOv8_Small_RDD.pt")
+# Set absolute path to the model file
+model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../model/YOLOv8_Small_RDD.pt"))
+logger.info(f"Loading YOLO model from: {model_path}")
+
+# Try to load YOLO model
+try:
+    model = YOLO(model_path)
+    USE_YOLO = True
+    logger.info("YOLO model loaded successfully")
+except Exception as e:
+    logger.warning(f"Could not load YOLO model: {e}")
+    model = None
+    USE_YOLO = False
 
 # Create FastAPI app
 app = FastAPI(
@@ -74,6 +86,23 @@ def get_entries(
             if user:
                 formatted_entry = format_entry_response(entry, user)
                 if formatted_entry:
+                    # Get detection summary from database
+                    detection_summary = db.get_detection_summary(entry["id"])
+                    
+                    # Add detection information to the response if available
+                    if detection_summary:
+                        formatted_entry["detection_info"] = {
+                            "total_cracks": detection_summary["total_cracks"],
+                            "crack_types": {}
+                        }
+                        
+                        # Format crack types information for the response
+                        for crack_type, info in detection_summary["crack_types"].items():
+                            formatted_entry["detection_info"]["crack_types"][crack_type] = {
+                                "count": info["count"],
+                                "avg_confidence": round(info["avg_confidence"] * 100, 2)  # Convert to percentage
+                            }
+                    
                     formatted_entries.append(formatted_entry)
         
         return formatted_entries
@@ -100,6 +129,23 @@ def get_entry(entry_id: str):
         formatted_entry = format_entry_response(entry, user)
         if not formatted_entry:
             raise HTTPException(status_code=500, detail="Error formatting entry")
+        
+        # Get detection summary from database
+        detection_summary = db.get_detection_summary(entry_id)
+        
+        # Add detection information to the response if available
+        if detection_summary:
+            formatted_entry["detection_info"] = {
+                "total_cracks": detection_summary["total_cracks"],
+                "crack_types": {}
+            }
+            
+            # Format crack types information for the response
+            for crack_type, info in detection_summary["crack_types"].items():
+                formatted_entry["detection_info"]["crack_types"][crack_type] = {
+                    "count": info["count"],
+                    "avg_confidence": round(info["avg_confidence"] * 100, 2)  # Convert to percentage
+                }
             
         return formatted_entry
     except HTTPException:
@@ -168,8 +214,34 @@ async def classify_image(image: str, user_id: str = None):
         # Encode result image to jpg and save it
         _, buffer = cv2.imencode('.jpg', img)
         classified_image_url = save_image(buffer.tobytes(), user_id)
-
-        return classified_image_url
+        
+        # Prepare detection summary
+        detection_summary = {
+            "classified_image_url": classified_image_url,
+            "detections": detections,
+            "total_cracks": len(detections),
+            "crack_types": {}
+        }
+        
+        # Count occurrences of each crack type and calculate average confidence
+        for detection in detections:
+            crack_type = detection["label"]
+            confidence = detection["confidence"]
+            
+            if crack_type not in detection_summary["crack_types"]:
+                detection_summary["crack_types"][crack_type] = {
+                    "count": 1,
+                    "confidences": [confidence],
+                    "avg_confidence": confidence
+                }
+            else:
+                detection_summary["crack_types"][crack_type]["count"] += 1
+                detection_summary["crack_types"][crack_type]["confidences"].append(confidence)
+                # Update average confidence
+                confidences = detection_summary["crack_types"][crack_type]["confidences"]
+                detection_summary["crack_types"][crack_type]["avg_confidence"] = sum(confidences) / len(confidences)
+        
+        return detection_summary
 
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -205,8 +277,22 @@ async def create_entry(
         # Save the image and get URL
         image_url = save_image(image_data, user_id)
 
-        # Classify the image and get the URL with bounding boxes
-        classified_image_url = await classify_image(image_url, user_id)
+        # Classify the image and get the detection summary
+        detection_summary = await classify_image(image_url, user_id)
+        
+        # Extract classified image URL and detection info
+        classified_image_url = detection_summary["classified_image_url"]
+        detections = detection_summary["detections"]
+        crack_types = detection_summary["crack_types"]
+        
+        # Determine the primary crack type based on highest confidence
+        primary_crack_type = "unknown"
+        highest_confidence = 0
+        
+        for crack_type, info in crack_types.items():
+            if info["avg_confidence"] > highest_confidence:
+                highest_confidence = info["avg_confidence"]
+                primary_crack_type = crack_type
         
         # Parse coordinates from JSON string
         coords = json.loads(coordinates)
@@ -219,17 +305,38 @@ async def create_entry(
             "location": location,
             "coordinates": coords,
             "severity": severity,
-            "type": crack_type,
+            "type": primary_crack_type,  # Use the primary crack type from detection
             "image_url": image_url,
             "classified_image_url": classified_image_url,
             "user_id": user_id,  # This should be a UUID in the database
             "created_at": datetime.now().isoformat()
         }
         
-        # Save to database
+        # Save entry to database
         new_entry = db.create_entry(entry_data)
         if not new_entry:
             raise HTTPException(status_code=500, detail="Failed to create entry")
+            
+        # Save individual crack detections to database
+        for detection in detections:
+            detection_data = {
+                "road_crack_id": new_entry["id"],
+                "crack_type": detection["label"],
+                "confidence": detection["confidence"],
+                "x1": detection["x1"],
+                "y1": detection["y1"],
+                "x2": detection["x2"],
+                "y2": detection["y2"]
+            }
+            db.create_crack_detection(detection_data)
+            
+        # Save detection summary to database
+        summary_data = {
+            "road_crack_id": new_entry["id"],
+            "total_cracks": detection_summary["total_cracks"],
+            "crack_types": crack_types
+        }
+        db.create_detection_summary(summary_data)
         
         # Get user info
         user = db.get_user(user_id)
@@ -239,6 +346,19 @@ async def create_entry(
         formatted_entry = format_entry_response(new_entry, user)
         if not formatted_entry:
             raise HTTPException(status_code=500, detail="Error formatting entry")
+        
+        # Add detection information to the response
+        formatted_entry["detection_info"] = {
+            "total_cracks": detection_summary["total_cracks"],
+            "crack_types": {}
+        }
+        
+        # Format crack types information for the response
+        for crack_type, info in crack_types.items():
+            formatted_entry["detection_info"]["crack_types"][crack_type] = {
+                "count": info["count"],
+                "avg_confidence": round(info["avg_confidence"] * 100, 2)  # Convert to percentage
+            }
             
         return formatted_entry
     except Exception as e:

@@ -49,5 +49,27 @@ class RoadCrackResponse(RoadCrackBase):
 
 class ClassificationResponse(BaseModel):
     """Response model for AI classification"""
-    type: str
+    classified_image_url: str
+    detections: List[dict]
+    total_cracks: int
+    crack_types: dict
+
+class CrackDetection(BaseModel):
+    """Model for individual crack detection"""
+    id: str
+    road_crack_id: str
+    crack_type: str
     confidence: float
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    created_at: datetime
+
+class DetectionSummary(BaseModel):
+    """Model for detection summary"""
+    id: str
+    road_crack_id: str
+    total_cracks: int
+    crack_types: dict
+    created_at: datetime

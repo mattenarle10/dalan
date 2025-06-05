@@ -25,6 +25,8 @@ except Exception as e:
 # Table names
 ROAD_CRACKS_TABLE = "road_cracks"
 USERS_TABLE = "users"
+CRACK_DETECTIONS_TABLE = "crack_detections"
+DETECTION_SUMMARIES_TABLE = "detection_summaries"
 
 # Road crack entries functions
 def get_all_entries(user_id=None, severity=None, crack_type=None):
@@ -71,6 +73,40 @@ def get_entry_by_id(entry_id):
     except Exception as e:
         logger.error(f"Error fetching entry {entry_id}: {e}")
         return None
+        
+def get_crack_detections(road_crack_id):
+    """
+    Get all crack detections for a road crack entry
+    
+    Args:
+        road_crack_id (str): Road crack entry ID
+        
+    Returns:
+        list: List of crack detections
+    """
+    try:
+        response = supabase.table(CRACK_DETECTIONS_TABLE).select("*").eq("road_crack_id", road_crack_id).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching crack detections for {road_crack_id}: {e}")
+        return []
+        
+def get_detection_summary(road_crack_id):
+    """
+    Get detection summary for a road crack entry
+    
+    Args:
+        road_crack_id (str): Road crack entry ID
+        
+    Returns:
+        dict: Detection summary or None if not found
+    """
+    try:
+        response = supabase.table(DETECTION_SUMMARIES_TABLE).select("*").eq("road_crack_id", road_crack_id).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.error(f"Error fetching detection summary for {road_crack_id}: {e}")
+        return None
 
 def create_entry(entry_data):
     """
@@ -87,6 +123,40 @@ def create_entry(entry_data):
         return response.data[0] if response.data else None
     except Exception as e:
         logger.error(f"Error creating entry: {e}")
+        return None
+        
+def create_crack_detection(detection_data):
+    """
+    Create a new crack detection entry
+    
+    Args:
+        detection_data (dict): Detection data including road_crack_id, crack_type, confidence, and bounding box coordinates
+        
+    Returns:
+        dict: Created detection or None if failed
+    """
+    try:
+        response = supabase.table(CRACK_DETECTIONS_TABLE).insert(detection_data).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.error(f"Error creating crack detection: {e}")
+        return None
+        
+def create_detection_summary(summary_data):
+    """
+    Create a new detection summary entry
+    
+    Args:
+        summary_data (dict): Summary data including road_crack_id, total_cracks, and crack_types summary
+        
+    Returns:
+        dict: Created summary or None if failed
+    """
+    try:
+        response = supabase.table(DETECTION_SUMMARIES_TABLE).insert(summary_data).execute()
+        return response.data[0] if response.data else None
+    except Exception as e:
+        logger.error(f"Error creating detection summary: {e}")
         return None
 
 def update_entry(entry_id, entry_data):

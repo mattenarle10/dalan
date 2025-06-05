@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 import uuid
 import logging
-import os
 from typing import List
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +14,7 @@ import cv2
 import os
 import uuid
 import base64
+import aiohttp
 import uvicorn 
 from dotenv import load_dotenv
 from models import RoadCrackCreate, RoadCrackResponse, RoadCrackUpdate, User
@@ -107,6 +107,76 @@ def get_entry(entry_id: str):
     except Exception as e:
         logger.error(f"Error in get_entry: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+async def classify_image(image: str, user_id: str):
+    # """
+    # Classify a road crack image
+    
+    # - **image**: Image file to classify
+    # """
+    # try:
+    #     image_data = await image.read()
+    #     crack_type = classify_crack_image(image_data)
+    #     return {"type": crack_type, "confidence": 0.92}  # Mock confidence score
+    # except Exception as e:
+    #     logger.error(f"Error in classify_image: {e}")
+    #     raise HTTPException(status_code=500, detail=str(e))
+    # Download image from URL
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image) as resp:
+                if resp.status != 200:
+                    return JSONResponse(content={"error": "Failed to download image"}, status_code=400)
+                img_bytes = await resp.read()
+
+        # Convert image bytes to OpenCV format
+        img_array = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return JSONResponse(content={"error": "Invalid image format"}, status_code=400)
+
+        # Save image temporarily
+        tmp_filename = f"temp_{uuid.uuid4().hex}.jpg"
+        cv2.imwrite(tmp_filename, img)
+
+        # Run YOLO prediction
+        results = model.predict(source=tmp_filename, conf=0.25)
+        os.remove(tmp_filename)
+
+        detections = []
+        for r in results:
+            for box in r.boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                confidence = float(box.conf[0])
+                class_id = int(box.cls[0])
+                class_name = model.names[class_id]
+
+                # Draw bounding box and label
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 0), 2)
+                label = f"{class_name} {confidence:.2f}"
+                cv2.putText(img, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+
+                detections.append({
+                    "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+                    "confidence": confidence,
+                    "class": class_id,
+                    "label": class_name
+                })
+
+        # # Encode result image back to base64
+        # _, buffer = cv2.imencode('.jpg', img)
+        # result_base64 = base64.b64encode(buffer).decode("utf-8")
+        classified_image = save_image(img, user_id)
+
+        return JSONResponse(content={
+            "result_image": classified_image,
+            "detections": detections
+        })
+
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.post("/api/entries")
 async def create_entry(
@@ -138,6 +208,10 @@ async def create_entry(
         
         # Save the image and get URL
         image_url = save_image(image_data, user_id)
+
+        classify_image(image_url, user_id)
+
+        classified_image_url = await classify_image(image_url)
         
         # Parse coordinates from JSON string
         coords = json.loads(coordinates)
@@ -152,6 +226,7 @@ async def create_entry(
             "severity": severity,
             "type": crack_type,
             "image_url": image_url,
+            "classified_image_url": classified_image_url,
             "user_id": user_id,  # This should be a UUID in the database
             "created_at": datetime.now().isoformat()
         }
@@ -237,68 +312,6 @@ def delete_entry(entry_id: str):
     except Exception as e:
         logger.error(f"Error in delete_entry: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/classify/{request}")
-async def classify_image(request: base64):
-    # """
-    # Classify a road crack image
-    
-    # - **image**: Image file to classify
-    # """
-    # try:
-    #     image_data = await image.read()
-    #     crack_type = classify_crack_image(image_data)
-    #     return {"type": crack_type, "confidence": 0.92}  # Mock confidence score
-    # except Exception as e:
-    #     logger.error(f"Error in classify_image: {e}")
-    #     raise HTTPException(status_code=500, detail=str(e))
-    try:
-        # Decode base64 photo
-        img_data = base64.b64decode(request.photo)
-        img_array = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-
-        if img is None:
-            return JSONResponse(content={"error": "Invalid image"}, status_code=400)
-
-        # Save image temporarily
-        tmp_filename = f"temp_{uuid.uuid4().hex}.jpg"
-        cv2.imwrite(tmp_filename, img)
-
-        # Run YOLO prediction
-        results = model.predict(source=tmp_filename, conf=0.25)
-        os.remove(tmp_filename)
-
-        detections = []
-        for r in results:
-            for box in r.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                confidence = float(box.conf[0])
-                class_id = int(box.cls[0])
-                class_name = model.names[class_id]
-
-                # Draw bounding box
-                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 0), 2)
-                label = f"{class_name} {confidence:.2f}"
-                cv2.putText(img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
-
-                detections.append({
-                    "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-                    "confidence": confidence,
-                    "class": class_id,
-                    "label": class_name
-                })
-
-        # Encode result image back to base64
-        _, buffer = cv2.imencode('.jpg', img)
-        result_base64 = base64.b64encode(buffer).decode("utf-8")
-
-        return JSONResponse(content={
-            "result_image": result_base64
-        })
-
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/api/users/me")
 def get_current_user():

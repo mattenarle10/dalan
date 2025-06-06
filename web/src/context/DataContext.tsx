@@ -13,10 +13,20 @@ export interface RoadCrackEntry {
   severity: 'minor' | 'major'
   type: string // This will be determined by AI
   image: string
+  classified_image?: string // URL to the AI-classified image
   user: {
     id: string
     name: string
     isCurrentUser: boolean
+  }
+  detection_info?: {
+    total_cracks: number
+    crack_types: {
+      [key: string]: {
+        count: number
+        avg_confidence: number
+      }
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X, Loader, Navigation } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,13 @@ export default function AddEntryPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   
+  // Location search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Array<{place_name: string, center: [number, number]}>>([]) 
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false)
+  
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,24 +56,99 @@ export default function AddEntryPage() {
     }
   }
 
-  // Function to handle location selection (demo)
-  const handleLocationSelect = () => {
-    // Generate random coordinates near Manila for demo purposes
-    const manilaCenterLng = 120.9842;
-    const manilaCenterLat = 14.5995;
+  // Function to search for locations using Mapbox Geocoding API
+  const searchLocation = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
     
-    // Random offset within ~1km
-    const lngOffset = (Math.random() - 0.5) * 0.02;
-    const latOffset = (Math.random() - 0.5) * 0.02;
+    setIsSearching(true);
+    setShowSearchResults(true);
     
-    const newCoordinates: [number, number] = [
-      manilaCenterLng + lngOffset,
-      manilaCenterLat + latOffset
-    ];
-    
-    setCoordinates(newCoordinates);
-    setLocation(`Sample Location #${Math.floor(Math.random() * 100)}`);
+    try {
+      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Geocoding request failed');
+      }
+      
+      const data = await response.json();
+      setSearchResults(data.features);
+    } catch (error) {
+      console.error('Error searching for location:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
   };
+  
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchLocation(searchQuery);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Function to select a location from search results
+  const handleSelectSearchResult = (result: {place_name: string, center: [number, number]}) => {
+    setLocation(result.place_name);
+    setCoordinates(result.center);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  };
+  
+  // Function to get current location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+    
+    setIsGettingCurrentLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { longitude, latitude } = position.coords;
+        const newCoordinates: [number, number] = [longitude, latitude];
+        setCoordinates(newCoordinates);
+        
+        // Reverse geocode to get location name
+        try {
+          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&limit=1`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.features && data.features.length > 0) {
+              setLocation(data.features[0].place_name);
+            } else {
+              setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error reverse geocoding:', error);
+          setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } finally {
+          setIsGettingCurrentLocation(false);
+        }
+      },
+      (error) => {
+        console.error('Error getting current location:', error);
+        alert('Unable to retrieve your location. Please ensure location services are enabled.');
+        setIsGettingCurrentLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };  
   
   // Function to handle map click
   const handleMapClick = (newCoordinates: [number, number]) => {
@@ -89,45 +171,56 @@ export default function AddEntryPage() {
   }
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     
-    // Add the new entry to our centralized data store
-    // The AI would determine the crack type in a real app
-    setTimeout(() => {
-      const currentUser = getCurrentUser();
+    try {
+      // Get the API URL from environment variables
+      const API_URL = process.env.NEXT_PUBLIC_API_URL;
       
-      // Create a new entry with mock crack type
-      const newEntryData: Omit<RoadCrackEntry, 'id' | 'date' | 'type'> = {
-        title,
-        description,
-        location,
-        coordinates,
-        severity,
-        image: previewUrl || '/placeholders/ex1.png',
-        user: {
-          id: currentUser.id,
-          name: currentUser.name,
-          isCurrentUser: true
-        }
-      };
+      if (!API_URL) {
+        throw new Error('API URL is not defined');
+      }
       
-      // Add entry to context - this will generate the ID and add the entry
-      addEntry(newEntryData);
+      if (!selectedFile) {
+        throw new Error('Please select an image');
+      }
       
-      // We need to find the newly added entry to get its ID
-      setTimeout(() => {
-        // Get the latest entries
-        const latestEntry = entries[0];
-        
-        // Update state
-        setIsSubmitting(false);
-        setIsSuccess(true);
-        setSubmittedEntry(latestEntry);
-        setShowSuccessModal(true);
-      }, 100); // Small delay to ensure entry is added
-    }, 1000)
+      // Create form data for multipart/form-data submission
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('location', location);
+      formData.append('coordinates', JSON.stringify(coordinates));
+      formData.append('severity', severity);
+      formData.append('user_id', '00472f53-73a0-4912-a79b-68407e5998e3'); 
+      formData.append('image', selectedFile);
+      
+      // Send the data to the backend API
+      const response = await fetch(`${API_URL}/api/entries`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the response data
+      const newEntry = await response.json();
+      
+      // Store the submitted entry for display in success modal
+      setSubmittedEntry(newEntry);
+      
+      setIsSubmitting(false)
+      setIsSuccess(true)
+      setShowSuccessModal(true)
+    } catch (error) {
+      console.error('Error submitting entry:', error);
+      alert(`Failed to submit entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -278,25 +371,68 @@ export default function AddEntryPage() {
               <label htmlFor="location" className="block text-sm font-medium">Location</label>
               <div className="relative">
                 <input
-                  id="location"
+                  id="search-location"
                   type="text"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchQuery && setShowSearchResults(true)}
                   className="w-full p-2 pl-10 rounded-md border border-gray-200 dark:border-gray-800 bg-background"
-                  placeholder="E.g., Main St, Manila"
-                  required
+                  placeholder="Search for a location..."
                 />
                 <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                {isSearching && (
+                  <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={16} />
+                )}
+                
+                {/* Search results dropdown */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 max-h-60 overflow-auto">
+                    {searchResults.map((result, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                        onClick={() => handleSelectSearchResult(result)}
+                      >
+                        {result.place_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div className="flex justify-end mt-1">
-                <button 
-                  type="button" 
-                  onClick={handleLocationSelect}
-                  className="text-xs text-blue-500 hover:text-blue-600"
-                >
-                  Get random location (demo)
-                </button>
+              
+              <div className="mt-2">
+                <p className="text-sm text-gray-500 mb-2">Selected location: <span className="font-medium">{location}</span></p>
+                <div className="flex space-x-2">
+                  <button 
+                    type="button" 
+                    onClick={getCurrentLocation}
+                    disabled={isGettingCurrentLocation}
+                    className="flex items-center text-xs px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    {isGettingCurrentLocation ? (
+                      <>
+                        <Loader size={12} className="mr-1 animate-spin" />
+                        Getting location...
+                      </>
+                    ) : (
+                      <>
+                        <Navigation size={12} className="mr-1" />
+                        Use my current location
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+              
+              <input
+                id="location"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="hidden"
+                required
+              />
             </div>
 
             <div className="flex justify-between mt-8">

@@ -15,16 +15,8 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
   
   if (!isOpen) return null
   
-  // Mock AI analysis results
-  const mockAnalysis = {
-    type: entry.type || 'Longitudinal Crack',
-    confidence: '92%',
-    severity: entry.severity,
-    estimatedRepairCost: entry.severity === 'minor' ? '$200-$400' : '$800-$1,200',
-    recommendedAction: entry.severity === 'minor' 
-      ? 'Schedule maintenance within 3 months' 
-      : 'Immediate repair recommended'
-  }
+  // Use the actual detection info from the API response
+  const detectionInfo = entry.detection_info
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -44,13 +36,27 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
           </div>
           
           <div className="space-y-4">
-            {/* Entry image */}
-            <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-              <img 
-                src={entry.image} 
-                alt={entry.title} 
-                className="w-full h-48 object-cover"
-              />
+            {/* Entry images - original and classified */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div className="bg-gray-100 dark:bg-gray-800 text-xs px-2 py-1 text-center">Original Image</div>
+                <img 
+                  src={entry.image} 
+                  alt={entry.title} 
+                  className="w-full h-36 object-cover"
+                />
+              </div>
+              
+              {entry.classified_image && (
+                <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                  <div className="bg-dalan-yellow/20 text-xs px-2 py-1 text-center">AI Classified Image</div>
+                  <img 
+                    src={entry.classified_image} 
+                    alt={`${entry.title} - Classified`} 
+                    className="w-full h-36 object-cover"
+                  />
+                </div>
+              )}
             </div>
             
             {/* Entry details */}
@@ -63,31 +69,48 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
               </div>
             </div>
             
-            {/* AI Analysis Results */}
+            {/* AI Analysis Results - Simplified for mobile */}
             <div className="bg-dalan-pastel-yellow/30 p-4 rounded-lg border border-dalan-yellow">
-              <h4 className="font-bold mb-2">AI Analysis Results</h4>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-400">Crack Type:</p>
-                  <p className="font-medium">{mockAnalysis.type}</p>
+              <h4 className="font-bold mb-2">Detection Summary</h4>
+              
+              {detectionInfo ? (
+                <>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium">Total Cracks:</span>
+                    <span className="font-bold">{detectionInfo.total_cracks}</span>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <p className="text-sm font-medium mb-2">Primary Type: <span className="font-bold">{entry.type}</span></p>
+                  </div>
+                  
+                  <div className="mt-3">
+                    <p className="text-sm font-medium mb-2">Detected Types:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(detectionInfo.crack_types).map(([type, info]) => (
+                        <div key={type} className="bg-white/50 dark:bg-gray-800/50 p-2 rounded flex-1 min-w-[120px]">
+                          <p className="font-medium text-sm">{type}</p>
+                          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <span>{info.count}</span>
+                            <span>{info.avg_confidence}%</span>
+                          </div>
+                          {/* Simple confidence bar */}
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
+                            <div 
+                              className="bg-dalan-yellow h-full rounded-full" 
+                              style={{ width: `${info.avg_confidence}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  Analysis information not available
                 </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-400">Confidence:</p>
-                  <p className="font-medium">{mockAnalysis.confidence}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-400">Severity:</p>
-                  <p className="font-medium capitalize">{mockAnalysis.severity}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-400">Est. Repair Cost:</p>
-                  <p className="font-medium">{mockAnalysis.estimatedRepairCost}</p>
-                </div>
-              </div>
-              <div className="mt-2">
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Recommendation:</p>
-                <p className="text-sm font-medium">{mockAnalysis.recommendedAction}</p>
-              </div>
+              )}
             </div>
             
             {/* Action buttons */}

@@ -1,13 +1,14 @@
 'use client'
 import { useState } from "react";
 import Image from "next/image";
-import { MapPin, Calendar, Tag, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
+import { MapPin, Calendar, Tag, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Modal from "@/components/Modal";
-import { useData, RoadCrackEntry } from "@/context/DataContext";
+import { RoadCrackEntry } from "@/context/DataContext";
+import { useEntries } from "@/lib/swr-hooks";
 
 export default function Dashboard() {
-  const { entries } = useData();
+  const { entries = [], isLoading: loading, isError: error } = useEntries();
   const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
@@ -37,10 +38,25 @@ export default function Dashboard() {
     setTypeFilter('all');
     setSeverityFilter('all');
     setSearchQuery('');
+    setViewMode('all');
   };
 
   return (
     <div className="flex flex-col w-full max-w-5xl mx-auto p-4 pt-20 pb-24 md:pt-24 md:pb-8">
+      {/* Error state */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-4 rounded-lg mb-6">
+          <p className="font-medium">Error loading entries</p>
+          <p className="text-sm">{error.message}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      
       {/* Dashboard Header with Search */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <div>
@@ -182,9 +198,50 @@ export default function Dashboard() {
         </button>
       </div>
       
-      {/* Entries Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredEntries.map(entry => (
+      {/* Entry Cards */}
+      {loading ? (
+        /* Skeleton UI - Shown when loading */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div 
+              key={i} 
+              className="bg-card border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden animate-pulse" 
+              style={{ animationDelay: `${i * 100}ms` }}
+            >
+              {/* Skeleton header */}
+              <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center">
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 mr-2"></div>
+                <div className="flex-1">
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-1"></div>
+                  <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                </div>
+              </div>
+              {/* Skeleton image */}
+              <div className="h-48 bg-gray-200 dark:bg-gray-700 relative">
+                <div className="absolute top-2 left-2 h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+              </div>
+              {/* Skeleton content */}
+              <div className="p-4">
+                <div className="flex justify-between mb-3">
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                </div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-4/5 mb-2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mt-3"></div>
+              </div>
+              {/* Skeleton footer */}
+              <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+              </div>
+            </div>
+          ))}
+          
+        </div>
+      ) : (
+        /* Actual entries - Shown when loaded */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          {filteredEntries.map((entry: RoadCrackEntry) => (
           <div key={entry.id} className="bg-card rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 flex flex-col h-full">
             {/* Card Header with User Info */}
             <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
@@ -271,10 +328,11 @@ export default function Dashboard() {
               </Link>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       
-      {filteredEntries.length === 0 && (
+      {!loading && filteredEntries.length === 0 && (
         <div className="text-center py-12 bg-card rounded-lg border border-gray-200 dark:border-gray-800">
           <p className="text-foreground/70 mb-2">No entries found with the current filters.</p>
           <button 

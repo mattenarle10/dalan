@@ -211,7 +211,7 @@ function DetailsContent() {
         {/* Top Section - Two Columns on Desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column - Image and Details */}
-          <div className="lg:col-span-7 space-y-5">
+          <div className="lg:col-span-7 space-y-5 flex flex-col">
             {/* Images - Original and Classified */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Original Image */}
@@ -242,8 +242,8 @@ function DetailsContent() {
               {/* Classified Image */}
               {entry.classified_image && (
                 <div className="rounded-lg overflow-hidden border border-input h-64 md:h-[300px] relative group">
-                  <div className="absolute top-2 left-2 bg-dalan-yellow/70 text-black text-xs px-2 py-0.5 rounded-full z-10">
-                    AI Classified
+                <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full z-10">
+                AI Classified
                   </div>
                   <img 
                     src={entry.classified_image} 
@@ -268,27 +268,29 @@ function DetailsContent() {
             </div>
             
             {/* Description with User Info */}
-            <div className="bg-card rounded-lg border border-input overflow-hidden">
-              <h2 className="text-base font-medium p-3 border-b border-input flex items-center">
-                <FileText size={16} className="mr-2 text-dalan-yellow" />
-                <span className="flex-1">Description</span>
-                <span className="text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-1 rounded-full">
+            <div className="bg-card rounded-lg border border-input overflow-hidden flex-grow">
+              <h2 className="text-base font-medium p-3 border-b border-input flex items-center bg-gradient-to-r from-dalan-yellow/5 to-transparent">
+                <div className="bg-dalan-yellow/15 p-1.5 rounded-lg mr-2">
+                  <FileText size={16} className="text-dalan-yellow" />
+                </div>
+                <span className="flex-1 font-semibold">Description</span>
+                <span className="text-xs bg-dalan-yellow/10 text-dalan-yellow px-2.5 py-1 rounded-full font-medium">
                   {entry.type}
                 </span>
               </h2>
               
-              <div className="p-4">
-                {/* Title first - highlighted */}
-                <h3 className="text-lg font-medium mb-3 text-foreground">{entry.title}</h3>
+              <div className="p-5">
+                {/* Title first - highlighted with better styling */}
+                <h3 className="text-xl font-medium mb-4 text-foreground border-l-4 border-dalan-yellow pl-3 py-1">{entry.title}</h3>
                 
-                {/* Description content - more prominent */}
-                <div className="bg-muted/30 p-3 rounded-md mb-4">
+                {/* Description content - more visually appealing */}
+                <div className="bg-gradient-to-br from-muted/20 to-muted/5 p-4 rounded-lg mb-5 border border-input/50">
                   <p className="text-foreground/90 leading-relaxed">{entry.description}</p>
                 </div>
                 
-                {/* User info - moved below description */}
-                <div className="flex items-center pt-2 border-t border-input">
-                  <div className="w-10 h-10 rounded-full bg-dalan-yellow/20 flex items-center justify-center mr-3 overflow-hidden">
+                {/* User info - moved below description with improved styling */}
+                <div className="flex items-center pt-3 border-t border-input mt-1">
+                  <div className="w-10 h-10 rounded-full bg-dalan-yellow/20 flex items-center justify-center mr-3 overflow-hidden border border-dalan-yellow/30">
                     {entry.user.avatar ? (
                       <img 
                         src={entry.user.avatar} 
@@ -303,15 +305,15 @@ function DetailsContent() {
                   </div>
                   
                   <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center flex-wrap gap-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-foreground">Reported by {entry.user.name}</p>
-                        <span className="text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-dalan-yellow/10 text-dalan-yellow px-2 py-0.5 rounded-full font-medium">
                           {entry.user.isCurrentUser ? 'You' : 'Editable'}
                         </span>
                       </div>
-                      <div className="flex items-center text-xs text-foreground/60">
-                        <Calendar size={12} className="mr-1" />
+                      <div className="flex items-center text-xs text-foreground/70 bg-muted/30 px-2 py-1 rounded-md">
+                        <Calendar size={12} className="mr-1 text-dalan-yellow" />
                         {formattedDate}
                       </div>
                     </div>
@@ -322,29 +324,33 @@ function DetailsContent() {
           </div>
           
           {/* Right Column - Map */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-5 flex flex-col">
             {/* Map */}
-            <div className="bg-card rounded-lg border border-input overflow-hidden">
-              <h2 className="text-base font-medium p-3 border-b border-input flex items-center">
-                <MapPin size={16} className="mr-2 text-dalan-yellow" />
-                Location
+            <div className="bg-card rounded-lg border border-input overflow-hidden flex-grow flex flex-col">
+              <h2 className="text-base font-medium p-3 border-b border-input flex items-center bg-gradient-to-r from-dalan-yellow/5 to-transparent">
+                <div className="bg-dalan-yellow/15 p-1.5 rounded-lg mr-2">
+                  <MapPin size={16} className="text-dalan-yellow" />
+                </div>
+                <span className="flex-1 font-semibold">Location</span>
               </h2>
               
-              <div className="px-3 py-2 border-b border-input bg-card/50">
+              <div className="px-4 py-3 border-b border-input bg-gradient-to-br from-muted/20 to-muted/5">
                 <div className="flex items-center">
-                  <MapPin size={14} className="mr-1.5 text-dalan-yellow" />
+                  <MapPin size={16} className="mr-2 text-dalan-yellow" />
                   <span className="text-sm font-medium">{entry.location}</span>
                 </div>
               </div>
               
-              <div className="h-60 lg:h-72">
-                <Map 
-                  initialCenter={entry.coordinates}
-                  zoom={16}
-                  markers={[{ position: entry.coordinates, popup: entry.title }]}
-                />
+              <div className="flex-grow h-[300px] md:h-[400px]">
+                <div className="h-full w-full">
+                  <Map 
+                    initialCenter={entry.coordinates}
+                    zoom={16}
+                    markers={[{ position: entry.coordinates, popup: entry.title }]}
+                  />
+                </div>
               </div>
-              <div className="p-3 border-t border-input">
+              <div className="p-3 border-t border-input bg-gradient-to-b from-transparent to-muted/10">
                 <button
                   onClick={() => router.push('/map')}
                   className="flex items-center justify-center py-1.5 px-3 w-full bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
@@ -372,7 +378,7 @@ function DetailsContent() {
             {detectionInfo ? (
               <div className="space-y-6">
                 {/* Summary Overview - Improved cards with better visual hierarchy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {/* Total Cracks */}
                   <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center mb-2">
@@ -398,38 +404,25 @@ function DetailsContent() {
                     <p className="text-xl font-bold text-foreground ml-1 truncate">{entry.type}</p>
                   </div>
                   
-                  {/* Severity */}
-                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center mb-2">
-                      <div className={`p-2 rounded-lg mr-3 ${entry.severity === 'minor' ? 'bg-amber-100/50 dark:bg-amber-900/30' : 'bg-red-100/50 dark:bg-red-900/30'}`}>
-                        <Shield size={18} className={entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'} />
+                    {/* Severity */}
+                    <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-center mb-2">
+                        <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                          <Shield size={18} className="text-dalan-yellow" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground/70">Severity</p>
                       </div>
-                      <p className="text-sm font-medium text-foreground/70">Severity</p>
-                    </div>
-                    <div className="flex items-center ml-1">
-                      <p className={`text-xl font-bold ${entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {entry.severity === 'minor' ? 'Minor' : 'Major'}
-                      </p>
-                      <span className={`text-xs ml-2 px-2 py-0.5 rounded-full ${entry.severity === 'minor' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300'}`}>
-                        {entry.severity === 'minor' ? 'Low Risk' : 'High Risk'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Action */}
-                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center mb-2">
-                      <div className={`p-2 rounded-lg mr-3 ${entry.severity === 'minor' ? 'bg-amber-100/50 dark:bg-amber-900/30' : 'bg-red-100/50 dark:bg-red-900/30'}`}>
-                        <Clock size={18} className={entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'} />
+                      <div className="flex items-center ml-1">
+                        <p className="text-xl font-bold text-foreground">
+                          {entry.severity === 'minor' ? 'Minor' : 'Major'}
+                        </p>
+                        <span className={`text-xs ml-2 px-2 py-0.5 rounded-full ${entry.severity === 'minor' ? 'bg-dalan-yellow/10 text-dalan-yellow' : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
+                          {entry.severity === 'minor' ? 'Low Risk' : 'High Risk'}
+                        </span>
                       </div>
-                      <p className="text-sm font-medium text-foreground/70">Recommended Action</p>
                     </div>
-                    <div className="flex items-center ml-1">
-                      <p className="text-xl font-bold text-foreground">
-                        {entry.severity === 'minor' ? '3 Month Window' : 'Immediate Repair'}
-                      </p>
-                    </div>
-                  </div>
+                    
+      
                 </div>
                 
                 {/* Crack Types - Redesigned Layout */}
@@ -441,14 +434,10 @@ function DetailsContent() {
                       </div>
                       <h3 className="font-medium text-foreground text-lg">Detected Crack Types</h3>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-xs bg-dalan-yellow/10 text-dalan-yellow px-3 py-1 rounded-full">
-                        {Object.keys(detectionInfo.crack_types).length} types detected
-                      </span>
-                    </div>
+                   
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  <div className="flex flex-col gap-5 overflow-y-auto">
                     {Object.entries(detectionInfo.crack_types).map(([type, info]) => {
                       // Type assertion to handle TypeScript unknown type
                       const crackInfo = info as CrackTypeInfo;
@@ -462,7 +451,6 @@ function DetailsContent() {
                         confidenceTextColor = 'text-green-600 dark:text-green-400';
                         confidenceBg = 'bg-green-50 dark:bg-green-900/20';
                         confidenceIcon = <CheckCircle size={16} className={confidenceTextColor} />;
-                        statusText = "High Confidence";
                         riskLevel = "Low";
                         riskColor = "text-green-600 dark:text-green-400";
                       } else if (confidenceLevel >= 60) {
@@ -470,7 +458,6 @@ function DetailsContent() {
                         confidenceTextColor = 'text-amber-600 dark:text-amber-400';
                         confidenceBg = 'bg-amber-50 dark:bg-amber-900/20';
                         confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                        statusText = "Medium Confidence";
                         riskLevel = "Medium";
                         riskColor = "text-amber-600 dark:text-amber-400";
                       } else {
@@ -478,7 +465,6 @@ function DetailsContent() {
                         confidenceTextColor = 'text-red-600 dark:text-red-400';
                         confidenceBg = 'bg-red-50 dark:bg-red-900/20';
                         confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                        statusText = "Low Confidence";
                         riskLevel = "High";
                         riskColor = "text-red-600 dark:text-red-400";
                       }
@@ -487,7 +473,7 @@ function DetailsContent() {
                       const crackWidth = ((type.charCodeAt(0) % 5) + 1).toFixed(1);
                       
                       return (
-                        <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30">
+                        <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30 w-full">
                           {/* Header with gradient background based on confidence */}
                           <div className={`p-4 border-b border-input bg-gradient-to-r ${confidenceLevel >= 80 ? 'from-green-50/50 to-transparent dark:from-green-900/10' : confidenceLevel >= 60 ? 'from-amber-50/50 to-transparent dark:from-amber-900/10' : 'from-red-50/50 to-transparent dark:from-red-900/10'}`}>
                             <div className="flex items-center justify-between">
@@ -528,26 +514,7 @@ function DetailsContent() {
                               </div>
                             </div>
                             
-                            {/* Crack details */}
-                            <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
-                              <div className="bg-muted/30 p-3 rounded-lg">
-                                <div className="text-xs text-foreground/60 mb-1">Average Width</div>
-                                <div className="font-semibold">{crackWidth}mm</div>
-                              </div>
-                              
-                              <div className="bg-muted/30 p-3 rounded-lg">
-                                <div className="text-xs text-foreground/60 mb-1">Risk Factor</div>
-                                <div className={`font-semibold ${riskColor}`}>{riskLevel}</div>
-                              </div>
-                              
-                              <div className="col-span-2 bg-muted/30 p-3 rounded-lg">
-                                <div className="text-xs text-foreground/60 mb-1">Recommendation</div>
-                                <div className="font-medium text-foreground">
-                                  {riskLevel === "High" ? "Immediate inspection required" : 
-                                   riskLevel === "Medium" ? "Monitor closely" : "Routine maintenance"}
-                                </div>
-                              </div>
-                            </div>
+                           
                           </div>
                         </div>
                       );

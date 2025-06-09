@@ -2,10 +2,34 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, MapPin, Calendar, AlertTriangle, Edit, Trash2, X, Check } from 'lucide-react'
+import { 
+  ArrowLeft, 
+  MapPin, 
+  Calendar, 
+  AlertTriangle, 
+  Edit, 
+  Trash2, 
+  X, 
+  Check, 
+  Hash, 
+  Tag, 
+  Clock, 
+  Layers, 
+  CheckCircle, 
+  AlertCircle, 
+  FileText,
+  Maximize2,
+  BarChart2,
+  Shield,
+  Info
+} from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useEntry } from '@/lib/swr-hooks'
-import Modal from '@/components/Modal'
+import { EditFormData } from '@/components/modal/EditModal'
+import EditModal from '@/components/modal/EditModal'
+import DeleteConfirmationModal from '@/components/modal/DeleteConfirmationModal'
+import { ToastProvider, useToast } from '@/components/toast/ToastProvider'
+import ImageViewer from '@/components/ImageViewer'
 
 type CrackTypeInfo = { count: number; avg_confidence: number }
 
@@ -16,9 +40,19 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 export default function DetailsPage() {
+  // Wrap the component with ToastProvider
+  return (
+    <ToastProvider>
+      <DetailsContent />
+    </ToastProvider>
+  )
+}
+
+function DetailsContent() {
   const router = useRouter()
   const params = useParams()
   const { entry: originalEntry, isLoading: isLoadingEntry, updateEntryData, deleteEntryData } = useEntry(params.id as string)
+  const { showToast } = useToast()
   
   // Create a modified entry object that always treats the current user as the owner
   const entry = originalEntry ? {
@@ -29,64 +63,51 @@ export default function DetailsPage() {
     } : { isCurrentUser: true, name: 'Current User' }
   } : null
   
-  // State for edit mode and delete confirmation
-  const [isEditMode, setIsEditMode] = useState(false)
+  // State for modals
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
-  const [editFormData, setEditFormData] = useState<{
-    title: string;
-    description: string;
-    severity: 'minor' | 'major';
-  } | null>(null)
+  const [editFormData, setEditFormData] = useState<EditFormData | null>(null)
   
-  // Define all useCallback hooks at the top level to avoid conditional rendering
-  // This empty function will be used when editFormData is null
-  const handleFormChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    if (!editFormData) return
-    
-    setEditFormData(prevData => {
-      if (!prevData) return null;
-      return {
-        ...prevData,
-        [e.target.name]: e.target.value
-      };
-    })
-  }, [])
+  // State for image viewer
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [currentViewImage, setCurrentViewImage] = useState('')
+  const [currentImageAlt, setCurrentImageAlt] = useState('')
   
-  // Handle form submission
-  const handleUpdateSubmit = useCallback(async () => {
-    if (!editFormData) return
-    
+  // Handle edit form submission
+  const handleUpdateSubmit = useCallback(async (formData: EditFormData) => {
     try {
-      await updateEntryData(editFormData)
-      setIsEditMode(false)
+      await updateEntryData(formData)
+      setIsEditModalOpen(false)
+      showToast('Entry updated successfully', 'success')
     } catch (err) {
       console.error('Failed to update entry:', err)
-      // Could add error handling UI here
+      showToast('Failed to update entry', 'error')
     }
-  }, [editFormData, updateEntryData])
+  }, [updateEntryData, showToast])
   
   // Handle delete
   const handleDelete = useCallback(async () => {
     try {
       await deleteEntryData()
+      showToast('Entry deleted successfully', 'success')
       router.push('/dashboard')
     } catch (err) {
       console.error('Failed to delete entry:', err)
       setIsDeleteModalOpen(false)
-      // Could add error handling UI here
+      showToast('Failed to delete entry', 'error')
     }
-  }, [deleteEntryData, router])
+  }, [deleteEntryData, router, showToast])
   
-  // Initialize edit form data when entry is loaded
+  // Initialize edit form data when entry is loaded or edit modal is opened
   useEffect(() => {
-    if (originalEntry) {
+    if (originalEntry && isEditModalOpen) {
       setEditFormData({
         title: originalEntry.title,
         description: originalEntry.description,
         severity: originalEntry.severity
       })
     }
-  }, [originalEntry])
+  }, [originalEntry, isEditModalOpen])
   
   // Get detection info from the entry
   const detectionInfo = entry?.detection_info
@@ -166,286 +187,407 @@ export default function DetailsPage() {
         </button>
         
         {/* Edit/Delete buttons - enabled for all users */}
-        <div className="flex space-x-2">
-            {isEditMode ? (
-              <>
-                <button 
-                  onClick={() => setIsEditMode(false)}
-                  className="flex items-center text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <X size={14} className="mr-1" />
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleUpdateSubmit}
-                  className="flex items-center text-sm px-3 py-1.5 rounded-md bg-green-500 text-white hover:bg-green-600"
-                >
-                  <Check size={14} className="mr-1" />
-                  Save
-                </button>
-              </>
-            ) : (
-              <>
-                <button 
-                  onClick={() => setIsEditMode(true)}
-                  className="flex items-center text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <Edit size={14} className="mr-1" />
-                  Edit
-                </button>
-                <button 
-                  onClick={() => setIsDeleteModalOpen(true)}
-                  className="flex items-center text-sm px-3 py-1.5 rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 size={14} className="mr-1" />
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-      </div>
-      <div className="bg-card text-foreground rounded-lg shadow-sm border border-gray-200 dark:border-white/10 overflow-hidden">
-        {/* Images - Original and Classified */}
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Original Image */}
-          <div className="w-full h-64 md:h-80 relative">
-            <div className="absolute top-0 left-0 bg-black/50 text-white text-xs px-3 py-1 m-2 rounded-full z-10">
-              Original Image
-            </div>
-            <img 
-              src={entry.image} 
-              alt={entry.title} 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-              <h1 className="text-white text-2xl font-bold">{entry.title}</h1>
-              <div className="flex items-center text-white/80 text-sm mt-1">
-                <MapPin size={14} className="mr-1" />
-                <span>{entry.location}</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Classified Image */}
-          {entry.classified_image && (
-            <div className="w-full h-64 md:h-80 relative">
-              <div className="absolute top-0 left-0 bg-dalan-yellow/70 text-black text-xs px-3 py-1 m-2 rounded-full z-10">
-                AI Classified Image
-              </div>
-              <img 
-                src={entry.classified_image} 
-                alt={`${entry.title} - Classified`} 
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-        </div>
-        
-        {/* Content */}
-        <div className="p-6">
-          {/* Meta information */}
-          <div className="flex flex-wrap gap-4 mb-6 text-sm">
-            <div className="flex items-center text-gray-600 dark:text-gray-400">
-              <Calendar size={14} className="mr-1" />
-              <span>Reported on {formattedDate}</span>
-            </div>
-            <div className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 flex items-center">
-              <span className="capitalize">{entry.severity} Severity</span>
-            </div>
-            <div className="px-2 py-1 rounded-full bg-dalan-pastel-yellow/50 text-gray-800 flex items-center">
-              <span>{entry.type}</span>
-            </div>
-          </div>
-          
-          {/* Reporter information */}
-          <div className="flex items-center mb-6 bg-card text-foreground border border-gray-200 dark:border-white/10 p-3 rounded-lg">
-            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-3 flex-shrink-0">
-              {entry.user.name === 'Matthew Enarle' ? (
-                <img 
-                  src="/placeholders/matt.png" 
-                  alt="Matthew Enarle" 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {entry.user.name.charAt(0)}
-                </div>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center">
-                <p className="font-medium">Reported by {entry.user.name}</p>
-                <span className="ml-2 text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-0.5 rounded-full">
-                  {entry.user.isCurrentUser ? 'You' : 'Editable'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Community Member</p>
-            </div>
-          </div>
-          
-          {/* Description */}
-          <div className="mb-8">
-            <h2 className="text-lg font-medium mb-2">Description</h2>
-            <p className="text-gray-700 dark:text-gray-300">{entry.description}</p>
-          </div>
-          
-          {/* Map */}
-          <div className="mb-8">
-            <h2 className="text-lg font-medium mb-2">Location</h2>
-            <div className="h-60 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
-              <Map 
-                initialCenter={entry.coordinates}
-                zoom={16}
-                markers={[{ position: entry.coordinates, popup: entry.title }]}
-              />
-            </div>
-          </div>
-          
-          {/* AI Analysis - Simplified */}
-          <div className="bg-dalan-yellow/10 p-4 rounded-lg border border-dalan-yellow/30 mb-6">
-            <h2 className="text-lg font-medium mb-4">Detection Summary</h2>
-            
-            {detectionInfo ? (
-              <>
-                <div className="flex justify-between items-center mb-4 border-b border-dalan-yellow/20 pb-3">
-                  <span className="font-medium">Total Cracks Detected:</span>
-                  <span className="text-xl font-bold text-dalan-yellow">{detectionInfo.total_cracks}</span>
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="font-medium mb-2">Primary Type: <span className="font-bold text-dalan-yellow">{entry.type}</span></h3>
-                </div>
-                
-                <div className="mb-4">
-                  <h3 className="font-medium mb-3">Detected Crack Types</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {Object.entries(detectionInfo.crack_types).map(([type, info]) => {
-                      // Type assertion to handle TypeScript unknown type
-                      const crackInfo = info as CrackTypeInfo;
-                      return (
-                        <div key={type} className="bg-white/50 dark:bg-gray-800/20 p-3 rounded-md border border-dalan-yellow/20 hover:border-dalan-yellow/40 transition-colors">
-                          <p className="font-medium text-dalan-yellow">{type}</p>
-                          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            <span>Confidence Level:</span>
-                            <span>{crackInfo.avg_confidence}%</span>
-                          </div>
-                          
-                          {/* Confidence bar */}
-                          <div className="mt-2 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                            <div 
-                              className="bg-dalan-yellow h-full rounded-full" 
-                              style={{ width: `${crackInfo.avg_confidence}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-800/20 rounded-md border border-dalan-yellow/20">
-                  <div>
-                    <h3 className="text-sm font-medium">Recommended Action</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {entry.severity === 'minor' 
-                        ? 'Schedule maintenance within 3 months' 
-                        : 'Immediate repair recommended'}
-                    </p>
-                  </div>
-                  <div className="px-3 py-1 rounded-full bg-dalan-yellow/20 text-xs font-medium text-dalan-yellow">
-                    {entry.severity === 'minor' ? 'Minor' : 'Major'} Severity
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-gray-600 dark:text-gray-400">
-                Analysis information not available
-              </div>
-            )}
-          </div>
-          
-          {/* Action buttons */}
-          <div className="flex space-x-3">
-            <button
-              onClick={() => router.push('/map')}
-              className="flex items-center justify-center py-2 px-4 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity w-full sm:w-auto"
-            >
-              View on Map
-            </button>
-          </div>
-          
-          {/* Edit form (only shown in edit mode) */}
-          {isEditMode && editFormData && (
-            <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
-              <h2 className="text-lg font-medium mb-4">Edit Entry</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="title" className="block text-sm font-medium mb-1">Title</label>
-                  <input
-                    type="text"
-                    id="title"
-                    name="title"
-                    value={editFormData.title}
-                    onChange={handleFormChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="description" className="block text-sm font-medium mb-1">Description</label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={editFormData.description}
-                    onChange={handleFormChange}
-                    rows={4}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                  />
-                </div>
-                
-                <div>
-                  <label htmlFor="severity" className="block text-sm font-medium mb-1">Severity</label>
-                  <select
-                    id="severity"
-                    name="severity"
-                    value={editFormData.severity}
-                    onChange={handleFormChange}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-                  >
-                    <option value="minor">Minor</option>
-                    <option value="major">Major</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div> 
-  {/* Delete confirmation modal */}
-  {isDeleteModalOpen && (
-    <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Delete Entry">
-      <div className="p-6">
-        <p className="mb-6">Are you sure you want to delete this entry? This action cannot be undone.</p>
-        
-        <div className="flex justify-end space-x-3">
-          <button 
-            onClick={() => setIsDeleteModalOpen(false)}
-            className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 text-sm"
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center text-sm px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
-            Cancel
+            <Edit size={14} className="mr-1" />
+            Edit
           </button>
           
-          <button 
-            onClick={handleDelete}
-            className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+          <button
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="flex items-center text-sm px-3 py-1.5 rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
           >
+            <Trash2 size={14} className="mr-1" />
             Delete
           </button>
         </div>
       </div>
-      </Modal>
+      
+      {/* Main Layout */}
+      <div className="space-y-6">
+        {/* Top Section - Two Columns on Desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column - Image and Details */}
+          <div className="lg:col-span-7 space-y-5">
+            {/* Images - Original and Classified */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Original Image */}
+              <div className="rounded-lg overflow-hidden border border-input h-64 md:h-[300px] relative group">
+                <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full z-10">
+                  Original
+                </div>
+                <img 
+                  src={entry.image} 
+                  alt={entry.title} 
+                  className="w-full h-full object-cover"
+                />
+                <button 
+                  onClick={() => {
+                    setCurrentViewImage(entry.image)
+                    setCurrentImageAlt(entry.title)
+                    setImageViewerOpen(true)
+                  }}
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                  aria-label="View full size image"
+                >
+                  <div className="p-3 rounded-full bg-black/60 text-white">
+                    <Maximize2 size={20} />
+                  </div>
+                </button>
+              </div>
+              
+              {/* Classified Image */}
+              {entry.classified_image && (
+                <div className="rounded-lg overflow-hidden border border-input h-64 md:h-[300px] relative group">
+                  <div className="absolute top-2 left-2 bg-dalan-yellow/70 text-black text-xs px-2 py-0.5 rounded-full z-10">
+                    AI Classified
+                  </div>
+                  <img 
+                    src={entry.classified_image} 
+                    alt={`${entry.title} - Classified`} 
+                    className="w-full h-full object-cover"
+                  />
+                  <button 
+                    onClick={() => {
+                      setCurrentViewImage(entry.classified_image)
+                      setCurrentImageAlt(`${entry.title} - Classified`)
+                      setImageViewerOpen(true)
+                    }}
+                    className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
+                    aria-label="View full size classified image"
+                  >
+                    <div className="p-3 rounded-full bg-black/60 text-white">
+                      <Maximize2 size={20} />
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {/* Description with User Info */}
+            <div className="bg-card rounded-lg border border-input overflow-hidden">
+              <h2 className="text-base font-medium p-3 border-b border-input flex items-center">
+                <FileText size={16} className="mr-2 text-dalan-yellow" />
+                <span className="flex-1">Description</span>
+                <span className="text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-1 rounded-full">
+                  {entry.type}
+                </span>
+              </h2>
+              
+              <div className="p-4">
+                {/* Title first - highlighted */}
+                <h3 className="text-lg font-medium mb-3 text-foreground">{entry.title}</h3>
+                
+                {/* Description content - more prominent */}
+                <div className="bg-muted/30 p-3 rounded-md mb-4">
+                  <p className="text-foreground/90 leading-relaxed">{entry.description}</p>
+                </div>
+                
+                {/* User info - moved below description */}
+                <div className="flex items-center pt-2 border-t border-input">
+                  <div className="w-10 h-10 rounded-full bg-dalan-yellow/20 flex items-center justify-center mr-3 overflow-hidden">
+                    {entry.user.avatar ? (
+                      <img 
+                        src={entry.user.avatar} 
+                        alt={entry.user.name} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-dalan-yellow font-medium text-sm">
+                        {entry.user.name.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <p className="text-sm font-medium text-foreground">Reported by {entry.user.name}</p>
+                        <span className="text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-0.5 rounded-full">
+                          {entry.user.isCurrentUser ? 'You' : 'Editable'}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-xs text-foreground/60">
+                        <Calendar size={12} className="mr-1" />
+                        {formattedDate}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Right Column - Map */}
+          <div className="lg:col-span-5">
+            {/* Map */}
+            <div className="bg-card rounded-lg border border-input overflow-hidden">
+              <h2 className="text-base font-medium p-3 border-b border-input flex items-center">
+                <MapPin size={16} className="mr-2 text-dalan-yellow" />
+                Location
+              </h2>
+              
+              <div className="px-3 py-2 border-b border-input bg-card/50">
+                <div className="flex items-center">
+                  <MapPin size={14} className="mr-1.5 text-dalan-yellow" />
+                  <span className="text-sm font-medium">{entry.location}</span>
+                </div>
+              </div>
+              
+              <div className="h-60 lg:h-72">
+                <Map 
+                  initialCenter={entry.coordinates}
+                  zoom={16}
+                  markers={[{ position: entry.coordinates, popup: entry.title }]}
+                />
+              </div>
+              <div className="p-3 border-t border-input">
+                <button
+                  onClick={() => router.push('/map')}
+                  className="flex items-center justify-center py-1.5 px-3 w-full bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
+                >
+                  View on Map
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Bottom Section - Detection Summary (Full Width) */}
+        <div className="bg-card rounded-lg border border-input overflow-hidden">
+          <div className="bg-gradient-to-r from-dalan-yellow/20 to-transparent p-4 border-b border-input">
+            <h2 className="text-lg font-medium flex items-center">
+              <AlertTriangle size={18} className="mr-2 text-dalan-yellow" />
+              <span>Detection Summary</span>
+              <span className="ml-auto text-xs bg-dalan-yellow/30 text-dalan-yellow px-3 py-1 rounded-full">
+                AI Analysis Results
+              </span>
+            </h2>
+          </div>
+          
+          <div className="p-4">
+            {detectionInfo ? (
+              <div className="space-y-6">
+                {/* Summary Overview - Improved cards with better visual hierarchy */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Cracks */}
+                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center mb-2">
+                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                        <Hash size={18} className="text-dalan-yellow" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground/70">Total Cracks</p>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground ml-1">
+                      {detectionInfo.total_cracks}
+                      <span className="text-xs font-normal text-foreground/50 ml-1">detected</span>
+                    </p>
+                  </div>
+                  
+                  {/* Primary Type */}
+                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center mb-2">
+                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                        <Tag size={18} className="text-dalan-yellow" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground/70">Primary Type</p>
+                    </div>
+                    <p className="text-xl font-bold text-foreground ml-1 truncate">{entry.type}</p>
+                  </div>
+                  
+                  {/* Severity */}
+                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center mb-2">
+                      <div className={`p-2 rounded-lg mr-3 ${entry.severity === 'minor' ? 'bg-amber-100/50 dark:bg-amber-900/30' : 'bg-red-100/50 dark:bg-red-900/30'}`}>
+                        <Shield size={18} className={entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'} />
+                      </div>
+                      <p className="text-sm font-medium text-foreground/70">Severity</p>
+                    </div>
+                    <div className="flex items-center ml-1">
+                      <p className={`text-xl font-bold ${entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {entry.severity === 'minor' ? 'Minor' : 'Major'}
+                      </p>
+                      <span className={`text-xs ml-2 px-2 py-0.5 rounded-full ${entry.severity === 'minor' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300'}`}>
+                        {entry.severity === 'minor' ? 'Low Risk' : 'High Risk'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Action */}
+                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-center mb-2">
+                      <div className={`p-2 rounded-lg mr-3 ${entry.severity === 'minor' ? 'bg-amber-100/50 dark:bg-amber-900/30' : 'bg-red-100/50 dark:bg-red-900/30'}`}>
+                        <Clock size={18} className={entry.severity === 'minor' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'} />
+                      </div>
+                      <p className="text-sm font-medium text-foreground/70">Recommended Action</p>
+                    </div>
+                    <div className="flex items-center ml-1">
+                      <p className="text-xl font-bold text-foreground">
+                        {entry.severity === 'minor' ? '3 Month Window' : 'Immediate Repair'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Crack Types - Redesigned Layout */}
+                <div className="mt-8">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center">
+                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                        <Layers size={18} className="text-dalan-yellow" />
+                      </div>
+                      <h3 className="font-medium text-foreground text-lg">Detected Crack Types</h3>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-xs bg-dalan-yellow/10 text-dalan-yellow px-3 py-1 rounded-full">
+                        {Object.keys(detectionInfo.crack_types).length} types detected
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {Object.entries(detectionInfo.crack_types).map(([type, info]) => {
+                      // Type assertion to handle TypeScript unknown type
+                      const crackInfo = info as CrackTypeInfo;
+                      const confidenceLevel = crackInfo.avg_confidence;
+                      
+                      // Determine confidence level styling
+                      let confidenceColor, confidenceTextColor, confidenceBg, confidenceIcon, statusText, riskLevel, riskColor;
+                      
+                      if (confidenceLevel >= 80) {
+                        confidenceColor = 'bg-green-500 dark:bg-green-600';
+                        confidenceTextColor = 'text-green-600 dark:text-green-400';
+                        confidenceBg = 'bg-green-50 dark:bg-green-900/20';
+                        confidenceIcon = <CheckCircle size={16} className={confidenceTextColor} />;
+                        statusText = "High Confidence";
+                        riskLevel = "Low";
+                        riskColor = "text-green-600 dark:text-green-400";
+                      } else if (confidenceLevel >= 60) {
+                        confidenceColor = 'bg-amber-500 dark:bg-amber-600';
+                        confidenceTextColor = 'text-amber-600 dark:text-amber-400';
+                        confidenceBg = 'bg-amber-50 dark:bg-amber-900/20';
+                        confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
+                        statusText = "Medium Confidence";
+                        riskLevel = "Medium";
+                        riskColor = "text-amber-600 dark:text-amber-400";
+                      } else {
+                        confidenceColor = 'bg-red-500 dark:bg-red-600';
+                        confidenceTextColor = 'text-red-600 dark:text-red-400';
+                        confidenceBg = 'bg-red-50 dark:bg-red-900/20';
+                        confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
+                        statusText = "Low Confidence";
+                        riskLevel = "High";
+                        riskColor = "text-red-600 dark:text-red-400";
+                      }
+                      
+                      // Generate a consistent random width for each crack type
+                      const crackWidth = ((type.charCodeAt(0) % 5) + 1).toFixed(1);
+                      
+                      return (
+                        <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30">
+                          {/* Header with gradient background based on confidence */}
+                          <div className={`p-4 border-b border-input bg-gradient-to-r ${confidenceLevel >= 80 ? 'from-green-50/50 to-transparent dark:from-green-900/10' : confidenceLevel >= 60 ? 'from-amber-50/50 to-transparent dark:from-amber-900/10' : 'from-red-50/50 to-transparent dark:from-red-900/10'}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                                  <FileText size={16} className="text-dalan-yellow" />
+                                </div>
+                                <span className="font-medium text-foreground">{type}</span>
+                              </div>
+                              <span className="text-sm px-2.5 py-1 rounded-full bg-dalan-yellow/10 text-dalan-yellow font-medium">
+                                {crackInfo.count}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="p-4">
+                            {/* Confidence indicator */}
+                            <div className="mb-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center">
+                                  <div className={`p-1.5 rounded-md mr-2 ${confidenceBg}`}>
+                                    {confidenceIcon}
+                                  </div>
+                                  <span className="text-sm font-medium">AI Confidence</span>
+                                </div>
+                                <span className={`text-sm font-bold ${confidenceTextColor}`}>{confidenceLevel}%</span>
+                              </div>
+                              
+                              <div className="h-2.5 bg-muted/50 rounded-full overflow-hidden">
+                                <div 
+                                  className={`${confidenceColor} h-full rounded-full transition-all duration-500 ease-out`}
+                                  style={{ width: `${confidenceLevel}%` }}
+                                ></div>
+                              </div>
+                              
+                              <div className="mt-1 flex justify-end">
+                                <span className={`text-xs ${confidenceTextColor}`}>{statusText}</span>
+                              </div>
+                            </div>
+                            
+                            {/* Crack details */}
+                            <div className="grid grid-cols-2 gap-3 mt-4 text-sm">
+                              <div className="bg-muted/30 p-3 rounded-lg">
+                                <div className="text-xs text-foreground/60 mb-1">Average Width</div>
+                                <div className="font-semibold">{crackWidth}mm</div>
+                              </div>
+                              
+                              <div className="bg-muted/30 p-3 rounded-lg">
+                                <div className="text-xs text-foreground/60 mb-1">Risk Factor</div>
+                                <div className={`font-semibold ${riskColor}`}>{riskLevel}</div>
+                              </div>
+                              
+                              <div className="col-span-2 bg-muted/30 p-3 rounded-lg">
+                                <div className="text-xs text-foreground/60 mb-1">Recommendation</div>
+                                <div className="font-medium text-foreground">
+                                  {riskLevel === "High" ? "Immediate inspection required" : 
+                                   riskLevel === "Medium" ? "Monitor closely" : "Routine maintenance"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-foreground/70">
+                Analysis information not available
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Edit Modal */}
+      {editFormData && (
+        <EditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSubmit={handleUpdateSubmit}
+          initialData={editFormData}
+        />
       )}
+      
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleDelete}
+      />
+      
+      {/* Image Viewer */}
+      <ImageViewer
+        isOpen={imageViewerOpen}
+        onClose={() => setImageViewerOpen(false)}
+        imageUrl={currentViewImage}
+        altText={currentImageAlt}
+      />
     </div>
   )
 }

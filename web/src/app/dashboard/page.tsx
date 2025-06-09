@@ -3,7 +3,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { MapPin, Calendar, Tag, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon, Loader2 } from "lucide-react";
 import Link from "next/link";
-import Modal from "@/components/Modal";
+import Modal from "@/components/modal/Modal";
 import { RoadCrackEntry } from "@/context/DataContext";
 import { useEntries } from "@/lib/swr-hooks";
 

@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useData, RoadCrackEntry } from '@/context/DataContext'
-import SuccessModal from '@/components/SuccessModal'
+import SuccessModal from '@/components/modal/SuccessModal'
 
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(() => import('@/components/Map'), { 

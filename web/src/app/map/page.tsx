@@ -2,9 +2,37 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Filter, X, MapPin, Calendar, AlertTriangle, ChevronRight, User, Search, Loader2 } from "lucide-react";
-import { useData, RoadCrackEntry } from "@/context/DataContext";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useEntries } from "@/lib/swr-hooks";
+
+// Define the entry type
+interface RoadCrackEntry {
+  id: string
+  title: string
+  description: string
+  location: string
+  coordinates: [number, number] // [longitude, latitude]
+  date: string
+  severity: 'minor' | 'major'
+  type: string
+  image: string
+  classified_image?: string
+  user: {
+    id: string
+    name: string
+    isCurrentUser: boolean
+  }
+  detection_info?: {
+    total_cracks: number
+    crack_types: {
+      [key: string]: {
+        count: number
+        avg_confidence: number
+      }
+    }
+  }
+}
 
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(
@@ -20,7 +48,7 @@ interface GeocodingResult {
 }
 
 export default function MapPage() {
-  const { entries } = useData();
+  const { entries, isLoading, isError } = useEntries();
   const searchParams = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<RoadCrackEntry | null>(null);
@@ -28,6 +56,9 @@ export default function MapPage() {
     types: [] as string[],
     severities: [] as string[]
   });
+  
+  // Store processed entries to handle loading state
+  const [processedEntries, setProcessedEntries] = useState<RoadCrackEntry[]>([]);
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,18 +69,25 @@ export default function MapPage() {
   const [mapZoom, setMapZoom] = useState(13);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  // Process entries when they're loaded
+  useEffect(() => {
+    if (entries && Array.isArray(entries)) {
+      setProcessedEntries(entries as RoadCrackEntry[]);
+    }
+  }, [entries]);
+  
   // Check URL params for entry ID, lat, lng on mount
   useEffect(() => {
     const entryId = searchParams.get('id');
-    if (entryId) {
-      const entry = entries.find(e => e.id === entryId);
+    if (entryId && processedEntries.length > 0) {
+      const entry = processedEntries.find(e => e.id === entryId);
       if (entry) {
         setSelectedEntry(entry);
         setMapCenter(entry.coordinates);
         setMapZoom(14);
       }
     }
-  }, [searchParams, entries]);
+  }, [searchParams, processedEntries]);
   
   // Handle clicks outside search results to close them
   useEffect(() => {
@@ -145,7 +183,7 @@ export default function MapPage() {
 
   // Handle marker click to show entry details
   const handleMarkerClick = (entryId: string) => {
-    const entry = entries.find(e => e.id === entryId);
+    const entry = processedEntries.find(e => e.id === entryId);
     if (entry) {
       setSelectedEntry(entry);
     }
@@ -157,7 +195,7 @@ export default function MapPage() {
   };
 
   // Filter entries based on active filters
-  const filteredEntries = entries.filter(entry => {
+  const filteredEntries = processedEntries.filter((entry: RoadCrackEntry) => {
     // If no filters are active, show all entries
     if (activeFilters.types.length === 0 && activeFilters.severities.length === 0) {
       return true;

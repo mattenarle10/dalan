@@ -1,6 +1,5 @@
 'use client'
 
-import { X } from 'lucide-react'
 import Modal from "@/components/modal/Modal";
 
 interface DeleteConfirmationModalProps {

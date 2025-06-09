@@ -1,6 +1,16 @@
 import useSWR, { mutate as globalMutate } from 'swr';
 import { updateEntry, deleteEntry } from './api';
 
+// Import or recreate the EntryUpdateData interface
+interface EntryUpdateData {
+  title?: string;
+  description?: string;
+  location?: string;
+  coordinates?: [number, number];
+  severity?: string;
+  type?: string;
+}
+
 // Generic fetcher function for SWR
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -57,7 +67,7 @@ export function useEntry(id: string) {
   );
   
   // Function to update an entry and revalidate cache
-  const updateEntryData = async (updatedData: any) => {
+  const updateEntryData = async (updatedData: EntryUpdateData) => {
     try {
       if (!id) throw new Error('Entry ID is required');
       

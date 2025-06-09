@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useParams, useRouter } from 'next/navigation'
 import { 
   ArrowLeft, 
@@ -9,19 +10,14 @@ import {
   AlertTriangle, 
   Edit, 
   Trash2, 
-  X, 
-  Check, 
   Hash, 
   Tag, 
-  Clock, 
   Layers, 
   CheckCircle, 
   AlertCircle, 
   FileText,
   Maximize2,
-  BarChart2,
-  Shield,
-  Info
+  Shield
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useEntry } from '@/lib/swr-hooks'
@@ -145,8 +141,6 @@ function DetailsContent() {
     );
   }
   
-  // Moved all useCallback hooks to the top level of the component to avoid conditional rendering
-  
   // Error or entry not found
   if (!entry) {
     return (
@@ -154,7 +148,7 @@ function DetailsContent() {
         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-6 max-w-md w-full text-center">
           <AlertTriangle className="mx-auto text-amber-500 mb-4" size={48} />
           <h1 className="text-xl font-bold mb-2">Entry Not Found</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">The road crack entry you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">The road crack entry you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <button
             onClick={() => router.push('/dashboard')}
             className="flex items-center justify-center mx-auto py-2 px-4 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity"
@@ -219,15 +213,17 @@ function DetailsContent() {
                 <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full z-10">
                   Original
                 </div>
-                <img 
+                <Image 
                   src={entry.image} 
-                  alt={entry.title} 
+                  alt={`Road crack: ${entry.title}`}
+                  width={800}
+                  height={600}
                   className="w-full h-full object-cover"
                 />
                 <button 
                   onClick={() => {
                     setCurrentViewImage(entry.image)
-                    setCurrentImageAlt(entry.title)
+                    setCurrentImageAlt(`Road crack: ${entry.title}`)
                     setImageViewerOpen(true)
                   }}
                   className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
@@ -245,15 +241,17 @@ function DetailsContent() {
                 <div className="absolute top-2 left-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full z-10">
                 AI Classified
                   </div>
-                  <img 
+                  <Image 
                     src={entry.classified_image} 
-                    alt={`${entry.title} - Classified`} 
+                    alt={`Road crack: ${entry.title} - Classified`}
+                    width={800}
+                    height={600}
                     className="w-full h-full object-cover"
                   />
                   <button 
                     onClick={() => {
                       setCurrentViewImage(entry.classified_image)
-                      setCurrentImageAlt(`${entry.title} - Classified`)
+                      setCurrentImageAlt(`Road crack: ${entry.title} - Classified`)
                       setImageViewerOpen(true)
                     }}
                     className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 transition-all duration-200 opacity-0 group-hover:opacity-100"
@@ -292,10 +290,12 @@ function DetailsContent() {
                 <div className="flex items-center pt-3 border-t border-input mt-1">
                   <div className="w-10 h-10 rounded-full bg-dalan-yellow/20 flex items-center justify-center mr-3 overflow-hidden border border-dalan-yellow/30">
                     {entry.user.avatar ? (
-                      <img 
+                      <Image 
                         src={entry.user.avatar} 
                         alt={entry.user.name} 
-                        className="w-full h-full object-cover"
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover rounded-full"
                       />
                     ) : (
                       <span className="text-dalan-yellow font-medium text-sm">
@@ -444,33 +444,26 @@ function DetailsContent() {
                       const confidenceLevel = crackInfo.avg_confidence;
                       
                       // Determine confidence level styling
-                      let confidenceColor, confidenceTextColor, confidenceBg, confidenceIcon, statusText, riskLevel, riskColor;
+                      let confidenceColor, confidenceTextColor, confidenceBg, confidenceIcon;
                       
                       if (confidenceLevel >= 80) {
                         confidenceColor = 'bg-green-500 dark:bg-green-600';
                         confidenceTextColor = 'text-green-600 dark:text-green-400';
                         confidenceBg = 'bg-green-50 dark:bg-green-900/20';
                         confidenceIcon = <CheckCircle size={16} className={confidenceTextColor} />;
-                        riskLevel = "Low";
-                        riskColor = "text-green-600 dark:text-green-400";
                       } else if (confidenceLevel >= 60) {
                         confidenceColor = 'bg-amber-500 dark:bg-amber-600';
                         confidenceTextColor = 'text-amber-600 dark:text-amber-400';
                         confidenceBg = 'bg-amber-50 dark:bg-amber-900/20';
                         confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                        riskLevel = "Medium";
-                        riskColor = "text-amber-600 dark:text-amber-400";
                       } else {
                         confidenceColor = 'bg-red-500 dark:bg-red-600';
                         confidenceTextColor = 'text-red-600 dark:text-red-400';
                         confidenceBg = 'bg-red-50 dark:bg-red-900/20';
                         confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                        riskLevel = "High";
-                        riskColor = "text-red-600 dark:text-red-400";
                       }
                       
-                      // Generate a consistent random width for each crack type
-                      const crackWidth = ((type.charCodeAt(0) % 5) + 1).toFixed(1);
+                      // Use type for the key in the div below
                       
                       return (
                         <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30 w-full">
@@ -507,10 +500,6 @@ function DetailsContent() {
                                   className={`${confidenceColor} h-full rounded-full transition-all duration-500 ease-out`}
                                   style={{ width: `${confidenceLevel}%` }}
                                 ></div>
-                              </div>
-                              
-                              <div className="mt-1 flex justify-end">
-                                <span className={`text-xs ${confidenceTextColor}`}>{statusText}</span>
                               </div>
                             </div>
                             

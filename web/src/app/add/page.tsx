@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X, Loader, Navigation } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
 import { useData, RoadCrackEntry } from '@/context/DataContext'
 import SuccessModal from '@/components/modal/SuccessModal'
 
@@ -15,8 +14,7 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 export default function AddEntryPage() {
-  const router = useRouter()
-  const { addEntry, getCurrentUser, entries } = useData()
+  const { } = useData() // Using the context but no variables needed yet
   
   // Form state
   const [title, setTitle] = useState('')
@@ -281,7 +279,7 @@ export default function AddEntryPage() {
               >
                 {previewUrl ? (
                   <div className="relative h-48 w-full">
-                    <img 
+                    <Image width={500} height={300} unoptimized 
                       src={previewUrl} 
                       alt="Road crack preview" 
                       className="h-full w-full object-contain"

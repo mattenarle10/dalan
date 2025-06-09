@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, Map as MapIcon, Grid, MapPin } from 'lucide-react';
 
 
@@ -74,7 +75,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
               <div className="flex flex-col">
                 <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
-  <img src="/placeholders/alligator.jpg" alt="Alligator crack example" className="w-full h-full object-cover rounded-t-lg" />
+  <Image src="/placeholders/alligator.jpg" alt="Alligator crack example" width={400} height={300} className="w-full h-full object-cover rounded-t-lg" />
 </div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Alligator Cracks</h4>
@@ -86,24 +87,24 @@ export default function Home() {
               
               <div className="flex flex-col">
                 <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
-  <img src="/placeholders/longitude.jpg" alt="Longitudinal crack example" className="w-full h-full object-cover rounded-t-lg" />
+  <Image src="/placeholders/longitude.jpg" alt="Longitudinal crack example" width={400} height={300} className="w-full h-full object-cover rounded-t-lg" />
 </div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Longitudinal Cracks</h4>
                   <p className="text-sm text-foreground/70">
-                    Cracks that run parallel to the road's centerline, often caused by poor joint construction or temperature cycles.
+                    Cracks that run parallel to the road&apos;s centerline, often caused by poor joint construction or temperature cycles.
                   </p>
                 </div>
               </div>
               
               <div className="flex flex-col">
                 <div className="h-40 bg-gray-200 dark:bg-black/40 rounded-t-lg overflow-hidden flex items-center justify-center">
-  <img src="/placeholders/transverse.jpeg" alt="Transverse crack example" className="w-full h-full object-cover rounded-t-lg" />
+  <Image src="/placeholders/transverse.jpeg" alt="Transverse crack example" width={400} height={300} className="w-full h-full object-cover rounded-t-lg" />
 </div>
                 <div className="p-4 border-t border-gray-200 dark:border-white/20">
                   <h4 className="font-bold mb-1">Transverse Cracks</h4>
                   <p className="text-sm text-foreground/70">
-                    Cracks that run perpendicular to the road's centerline, usually caused by thermal shrinkage or underlying cracks.
+                    Cracks that run perpendicular to the road&apos;s centerline, usually caused by thermal shrinkage or underlying cracks.
                   </p>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Filter, X, MapPin, Calendar, AlertTriangle, ChevronRight, User, Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -48,7 +49,7 @@ interface GeocodingResult {
 }
 
 export default function MapPage() {
-  const { entries, isLoading, isError } = useEntries();
+  const { entries } = useEntries();
   const searchParams = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<RoadCrackEntry | null>(null);
@@ -124,7 +125,7 @@ export default function MapPage() {
       const data = await response.json();
       
       if (data.features) {
-        setSearchResults(data.features.map((feature: any) => ({
+        setSearchResults(data.features.map((feature: { id: string; place_name: string; center: [number, number] }) => ({
           id: feature.id,
           place_name: feature.place_name,
           center: feature.center
@@ -365,9 +366,11 @@ export default function MapPage() {
           <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 z-10 !bg-background text-foreground rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden"
                style={{ backgroundColor: 'var(--background)' }}>
             <div className="relative h-36 w-full overflow-hidden">
-              <img 
+              <Image 
                 src={selectedEntry.image} 
                 alt={selectedEntry.title}
+                width={500}
+                height={300}
                 className="w-full h-full object-cover"
               />
               <button 

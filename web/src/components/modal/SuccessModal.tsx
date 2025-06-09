@@ -2,6 +2,7 @@
 
 import { X, MapPin, CheckCircle, ArrowRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { RoadCrackEntry } from '@/context/DataContext'
 
 interface SuccessModalProps {
@@ -40,9 +41,11 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                 <div className="bg-gray-100 dark:bg-gray-800 text-xs px-2 py-1 text-center">Original Image</div>
-                <img 
+                <Image 
                   src={entry.image} 
                   alt={entry.title} 
+                  width={300}
+                  height={150}
                   className="w-full h-36 object-cover"
                 />
               </div>
@@ -50,9 +53,11 @@ export default function SuccessModal({ isOpen, onClose, entry }: SuccessModalPro
               {entry.classified_image && (
                 <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
                   <div className="bg-dalan-yellow/20 text-xs px-2 py-1 text-center">AI Classified Image</div>
-                  <img 
+                  <Image 
                     src={entry.classified_image} 
                     alt={`${entry.title} - Classified`} 
+                    width={300}
+                    height={150}
                     className="w-full h-36 object-cover"
                   />
                 </div>

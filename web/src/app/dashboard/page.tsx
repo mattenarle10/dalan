@@ -1,14 +1,14 @@
 'use client'
 import { useState } from "react";
 import Image from "next/image";
-import { MapPin, Calendar, Tag, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon, Loader2 } from "lucide-react";
+import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
 import Link from "next/link";
 import Modal from "@/components/modal/Modal";
 import { RoadCrackEntry } from "@/context/DataContext";
 import { useEntries } from "@/lib/swr-hooks";
 
 export default function Dashboard() {
-  const { entries = [], isLoading: loading, isError: error } = useEntries();
+  const { entries = [], isLoading: loading } = useEntries();
   const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
@@ -44,10 +44,10 @@ export default function Dashboard() {
   return (
     <div className="flex flex-col w-full max-w-5xl mx-auto p-4 pt-20 pb-24 md:pt-24 md:pb-8">
       {/* Error state */}
-      {error && (
+      {false && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 p-4 rounded-lg mb-6">
           <p className="font-medium">Error loading entries</p>
-          <p className="text-sm">{error.message}</p>
+          <p className="text-sm">Failed to load data</p>
           <button 
             onClick={() => window.location.reload()}
             className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
@@ -248,9 +248,11 @@ export default function Dashboard() {
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-2 flex-shrink-0">
                   {entry.user.name === 'Matthew Enarle' ? (
-                    <img 
+                    <Image 
                       src="/placeholders/matt.png" 
                       alt="Matthew Enarle" 
+                      width={32}
+                      height={32}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -275,9 +277,11 @@ export default function Dashboard() {
             {/* Image with Map Overlay */}
             <div className="relative h-48 w-full overflow-hidden">
               {/* Actual image */}
-              <img 
+              <Image 
                 src={entry.image} 
                 alt={entry.title}
+                width={400}
+                height={300}
                 className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
               />
               

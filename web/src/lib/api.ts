@@ -2,6 +2,16 @@
  * API service for communicating with the backend
  */
 
+// Define interface for entry update data
+interface EntryUpdateData {
+  title?: string;
+  description?: string;
+  location?: string;
+  coordinates?: [number, number];
+  severity?: string;
+  type?: string;
+}
+
 // Get the API URL from environment variables
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -79,7 +89,7 @@ export async function createEntry(formData: FormData) {
 /**
  * Update an existing road crack entry
  */
-export async function updateEntry(entryId: string, data: any) {
+export async function updateEntry(entryId: string, data: EntryUpdateData) {
   try {
     const response = await fetch(`${API_URL}/api/entries/${entryId}`, {
       method: 'PUT',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { X, ZoomIn, ZoomOut, RotateCw } from 'lucide-react'
 
 interface ImageViewerProps {
@@ -42,13 +43,16 @@ export default function ImageViewer({ isOpen, onClose, imageUrl, altText }: Imag
         
         {/* Image container */}
         <div className="relative overflow-auto bg-black/30 rounded-lg p-2 max-h-[80vh] flex items-center justify-center">
-          <img
+          <Image
             src={imageUrl}
             alt={altText}
-            className="max-w-full max-h-[75vh] object-contain transition-transform duration-200"
+            width={1200}
+            height={800}
+            className="max-w-full max-h-[75vh] object-contain transition-transform duration-200" 
             style={{ 
               transform: `scale(${scale}) rotate(${rotation}deg)`,
             }}
+            unoptimized // Use unoptimized for zooming/rotation functionality
           />
         </div>
         

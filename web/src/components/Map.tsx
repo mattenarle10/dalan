@@ -106,7 +106,7 @@ export default function Map({
         mapInstance.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this only runs once on mount
+  }, [initialCenter, interactive, onMapClick, zoom]); // Include dependencies used in the effect
   
   // Handle markers separately after map is initialized
   useEffect(() => {
@@ -143,7 +143,7 @@ export default function Map({
               el.style.filter = `drop-shadow(0 0 4px ${severityColor})`;
             }
             
-            const markerElement = new mapboxgl.Marker(el)
+            new mapboxgl.Marker(el)
               .setLngLat(marker.position)
               .addTo(map);
             
@@ -156,7 +156,7 @@ export default function Map({
           });
         } else {
           // Add default marker if no markers provided
-          const defaultMarker = new mapboxgl.Marker()
+          new mapboxgl.Marker()
             .setLngLat(initialCenter)
             .addTo(map);
         }
@@ -166,7 +166,7 @@ export default function Map({
     };
     
     addMarkers();
-  }, [mapInitialized, markers, initialCenter]);
+  }, [mapInitialized, markers, initialCenter, onMarkerClick]);
   
   // Update map center and zoom when props change
   useEffect(() => {

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Filter, X, MapPin, Calendar, AlertTriangle, ChevronRight, User, Search, Loader2 } from "lucide-react";
@@ -48,7 +48,8 @@ interface GeocodingResult {
   center: [number, number]; // [lng, lat]
 }
 
-export default function MapPage() {
+// Client component that uses useSearchParams
+function MapContent() {
   const { entries } = useEntries();
   const searchParams = useSearchParams();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -428,4 +429,13 @@ export default function MapPage() {
       </div>
     </div>
   );
+}
+
+// Main page component wrapped in Suspense
+export default function MapPage() {
+  return (
+    <Suspense fallback={<div className="w-full h-screen flex items-center justify-center"><Loader2 className="animate-spin" size={24} /></div>}>
+      <MapContent />
+    </Suspense>
+  )
 }

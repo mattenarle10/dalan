@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 
 interface MapProps {
@@ -16,17 +16,22 @@ interface MapProps {
   onMapClick?: (coordinates: [number, number]) => void;
   onMarkerClick?: (id: string) => void;
   interactive?: boolean;
+  centerPin?: boolean; // Whether to show a fixed pin at the center of the map
+  onCenterChanged?: (coordinates: [number, number]) => void; // Called when map center changes (for drag-to-position)
 }
 
 // Component that loads and displays a Mapbox map
-export default function Map({ 
+// Using forwardRef to expose the map instance and methods to parent components
+const Map = forwardRef(({ 
   initialCenter = [120.9842, 14.5995], // Manila coordinates [longitude, latitude]
   zoom = 13,
   markers = [],
   onMapClick,
   onMarkerClick,
-  interactive = true
-}: MapProps) {
+  interactive = true,
+  centerPin = false,
+  onCenterChanged
+}: MapProps, ref) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<MapboxMap | null>(null);
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -57,12 +62,27 @@ export default function Map({
           attributionControl: true,
           preserveDrawingBuffer: true, // Helps with certain rendering issues
           failIfMajorPerformanceCaveat: false, // More permissive rendering
-          renderWorldCopies: true // Prevents edge cases at world boundaries
+          renderWorldCopies: true, // Prevents edge cases at world boundaries
+          trackResize: true,
+          maxZoom: 18
         });
         
-        // Error handling
+        // Prevent error callback issues
         map.on('error', (e) => {
           console.error('Mapbox error:', e.error);
+        });
+        
+        // Add error handler to prevent uncaught errors
+        map.on('load', () => {
+          // Override the default error handler
+          // @ts-ignore - Accessing internal property to prevent errors
+          if (map._requestManager) {
+            // @ts-ignore
+            map._requestManager.errorCallback = () => {
+              console.warn('Handled map error');
+              return true; // Prevent uncaught error
+            };
+          }
         });
         
         // Only update state if component is still mounted
@@ -90,6 +110,21 @@ export default function Map({
             // Change cursor to pointer when hovering over map
             map.getCanvas().style.cursor = 'pointer';
           }
+          
+          // Add move end event handler if centerPin and onCenterChanged are provided
+          if (centerPin && onCenterChanged) {
+            // Initial call to set the location based on the initial center
+            setTimeout(() => {
+              const center = map.getCenter();
+              onCenterChanged([center.lng, center.lat]);
+            }, 500);
+            
+            // Update when map movement ends
+            map.on('moveend', () => {
+              const center = map.getCenter();
+              onCenterChanged([center.lng, center.lat]);
+            });
+          }
         }
       } catch (error) {
         console.error('Error initializing Mapbox map:', error);
@@ -106,14 +141,14 @@ export default function Map({
         mapInstance.current = null;
       }
     };
-  }, [initialCenter, interactive, onMapClick, zoom]); // Include dependencies used in the effect
+  }, [initialCenter, interactive, onMapClick, zoom, centerPin, onCenterChanged]); // Include dependencies used in the effect
   
   // Handle markers separately after map is initialized
   useEffect(() => {
     if (!mapInitialized || !mapInstance.current) return;
     
-    // Debug log to verify markers are being passed correctly
-    console.log('Adding markers:', markers);
+    // Skip adding markers if using centerPin mode
+    if (centerPin) return;
     
     const addMarkers = async () => {
       try {
@@ -181,7 +216,7 @@ export default function Map({
     };
     
     addMarkers();
-  }, [mapInitialized, markers, onMarkerClick, initialCenter, interactive]);
+  }, [mapInitialized, markers, onMarkerClick, initialCenter, interactive, centerPin]);
   
   // Update map center and zoom when props change
   useEffect(() => {
@@ -193,7 +228,50 @@ export default function Map({
     map.setZoom(zoom);
   }, [mapInitialized, initialCenter, zoom]);
 
+  // Expose methods to parent components using useImperativeHandle
+  useImperativeHandle(ref, () => ({
+    // Expose the map instance
+    mapInstance: mapInstance.current,
+    // Method to set the center of the map
+    setCenter: (coordinates: [number, number]) => {
+      if (mapInstance.current) {
+        mapInstance.current.setCenter(coordinates);
+      }
+    },
+    // Method to get the current center of the map
+    getCenter: () => {
+      if (mapInstance.current) {
+        const center = mapInstance.current.getCenter();
+        return [center.lng, center.lat] as [number, number];
+      }
+      return initialCenter;
+    },
+    // Method to check if map is initialized
+    isInitialized: () => mapInitialized
+  }), [mapInitialized]);
+
   return (
-    <div ref={mapContainer} className="w-full h-full rounded-lg" />
+    <div className="relative w-full h-full">
+      <div ref={mapContainer} className="w-full h-full rounded-lg" />
+      
+      {/* Fixed center pin that stays in the middle of the map */}
+      {centerPin && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
+          <div className="w-10 h-10 flex items-center justify-center">
+            <div 
+              className="w-8 h-8 bg-contain bg-no-repeat" 
+              style={{ 
+                backgroundImage: 'url(/map-pin.svg)',
+                filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.5))',
+                transform: 'translateY(-50%)' // Adjust pin position to point at exact center
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
+});
+
+// Export the Map component
+export default Map;

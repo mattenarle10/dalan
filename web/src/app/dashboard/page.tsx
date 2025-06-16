@@ -4,7 +4,7 @@ import Image from "next/image";
 import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
 import Link from "next/link";
 import Modal from "@/components/modal/Modal";
-import { RoadCrackEntry } from "@/context/DataContext";
+import { RoadCrackEntry } from "@/lib/interface";
 import { useEntries } from "@/lib/swr-hooks";
 
 export default function Dashboard() {
@@ -18,7 +18,7 @@ export default function Dashboard() {
   // Filter entries based on selected filters
   const filteredEntries = entries.filter((entry: RoadCrackEntry) => {
     // View mode filter (All vs My Entries)
-    if (viewMode === 'my' && !entry.user.isCurrentUser) return false;
+    if (viewMode === 'my' && !entry.user?.isCurrentUser) return false;
     
     // Type filter
     if (typeFilter !== 'all' && entry.type.toLowerCase() !== typeFilter.toLowerCase()) return false;
@@ -247,7 +247,7 @@ export default function Dashboard() {
             <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-2 flex-shrink-0">
-                  {entry.user.name === 'Matthew Enarle' ? (
+                  {entry.user?.name === 'Matthew Enarle' ? (
                     <Image 
                       src="/placeholders/matt.png" 
                       alt="Matthew Enarle" 
@@ -257,17 +257,17 @@ export default function Dashboard() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400">
-                      {entry.user.name.charAt(0)}
+                      {entry.user?.name?.charAt(0) || '?'}
                     </div>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{entry.user.name}</p>
-                  <p className="text-xs text-foreground/50">{new Date(entry.date).toLocaleDateString()}</p>
+                  <p className="text-sm font-medium">{entry.user?.name || 'Unknown User'}</p>
+                  <p className="text-xs text-foreground/50">{entry.date ? new Date(entry.date).toLocaleDateString() : new Date(entry.created_at).toLocaleDateString()}</p>
                 </div>
               </div>
               
-              {entry.user.isCurrentUser && (
+              {entry.user?.isCurrentUser && (
                 <span className="text-xs bg-dalan-yellow/20 text-dalan-yellow px-2 py-0.5 rounded-full">
                   Your Entry
                 </span>

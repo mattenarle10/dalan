@@ -112,6 +112,9 @@ export default function Map({
   useEffect(() => {
     if (!mapInitialized || !mapInstance.current) return;
     
+    // Debug log to verify markers are being passed correctly
+    console.log('Adding markers:', markers);
+    
     const addMarkers = async () => {
       try {
         const mapboxgl = (await import('mapbox-gl')).default;
@@ -125,37 +128,49 @@ export default function Map({
         
         const map = mapInstance.current;
         
-        if (markers.length > 0) {
+        if (markers && markers.length > 0) {
           markers.forEach(marker => {
-            // Create custom marker element with severity indicator
+            // Create a simple visible marker element
             const el = document.createElement('div');
             el.className = 'custom-marker';
-            el.style.width = '24px';
-            el.style.height = '24px';
+            el.style.width = '30px';
+            el.style.height = '30px';
             el.style.backgroundImage = 'url(/map-pin.svg)';
             el.style.backgroundSize = 'contain';
             el.style.backgroundRepeat = 'no-repeat';
             el.style.cursor = 'pointer';
             
-            // Add severity indicator
-            if (marker.severity) {
-              const severityColor = marker.severity === 'major' ? '#ef4444' : '#f59e0b';
-              el.style.filter = `drop-shadow(0 0 4px ${severityColor})`;
+            // Make sure marker is visible with high contrast
+            el.style.filter = 'drop-shadow(0 0 2px rgba(0,0,0,0.5))';
+            
+            // Set color based on severity
+            if (marker.severity === 'major') {
+              el.style.color = '#FF0000'; // Bright red for visibility
+            } else {
+              el.style.color = '#FFCB14'; // Dalan yellow
             }
             
-            new mapboxgl.Marker(el)
-              .setLngLat(marker.position)
-              .addTo(map);
-            
-            // Add click handler if onMarkerClick is provided and marker has ID
-            if (onMarkerClick && marker.id) {
-              el.addEventListener('click', () => {
-                onMarkerClick(marker.id!);
-              });
+            // Create and add the marker
+            try {
+              const mapMarker = new mapboxgl.Marker(el)
+                .setLngLat(marker.position)
+                .addTo(map);
+              
+              console.log('Marker added at position:', marker.position);
+              
+              // Add click handler if onMarkerClick is provided and marker has ID
+              if (onMarkerClick && marker.id) {
+                el.addEventListener('click', () => {
+                  onMarkerClick(marker.id!);
+                });
+              }
+            } catch (markerError) {
+              console.error('Error adding individual marker:', markerError);
             }
           });
-        } else {
-          // Add default marker if no markers provided
+        } else if (interactive) {
+          // Add default marker at initial center if no markers provided and map is interactive
+          console.log('No markers provided, adding default marker at:', initialCenter);
           new mapboxgl.Marker()
             .setLngLat(initialCenter)
             .addTo(map);
@@ -166,7 +181,7 @@ export default function Map({
     };
     
     addMarkers();
-  }, [mapInitialized, markers, initialCenter, onMarkerClick]);
+  }, [mapInitialized, markers, onMarkerClick, initialCenter, interactive]);
   
   // Update map center and zoom when props change
   useEffect(() => {

@@ -1,15 +1,6 @@
 import useSWR, { mutate as globalMutate } from 'swr';
 import { updateEntry, deleteEntry } from './api';
-
-// Import or recreate the EntryUpdateData interface
-interface EntryUpdateData {
-  title?: string;
-  description?: string;
-  location?: string;
-  coordinates?: [number, number];
-  severity?: string;
-  type?: string;
-}
+import { EntryUpdateData } from './interface';
 
 // Generic fetcher function for SWR
 const fetcher = async (url: string) => {

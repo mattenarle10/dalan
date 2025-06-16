@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X, Loader, Navigation } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import { useData, RoadCrackEntry } from '@/context/DataContext'
 import SuccessModal from '@/components/modal/SuccessModal'
+import { createEntry } from '@/lib/api'
+import { RoadCrackEntry } from '@/lib/interface'
 
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(() => import('@/components/Map'), { 
@@ -14,7 +15,6 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 export default function AddEntryPage() {
-  const { } = useData() // Using the context but no variables needed yet
   
   // Form state
   const [title, setTitle] = useState('')
@@ -25,12 +25,15 @@ export default function AddEntryPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   
-  // Location search state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<Array<{place_name: string, center: [number, number]}>>([]) 
-  const [isSearching, setIsSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false)
+  // State for location search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false);
+  
+  // Ref for map container to scroll to it when needed
+  const mapContainer = useRef<HTMLDivElement>(null);
   
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1)
@@ -38,6 +41,7 @@ export default function AddEntryPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [submittedEntry, setSubmittedEntry] = useState<RoadCrackEntry | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
   
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,6 +104,11 @@ export default function AddEntryPage() {
     setCoordinates(result.center);
     setShowSearchResults(false);
     setSearchQuery('');
+    
+    // Focus back on the map to show the user their selection
+    if (mapContainer.current) {
+      mapContainer.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
   
   // Function to get current location
@@ -149,10 +158,42 @@ export default function AddEntryPage() {
   };  
   
   // Function to handle map click
-  const handleMapClick = (newCoordinates: [number, number]) => {
-    setCoordinates(newCoordinates);
-    // Update location text with coordinates (can be replaced with reverse geocoding in a real app)
-    setLocation(`Selected Location (${newCoordinates[1].toFixed(4)}, ${newCoordinates[0].toFixed(4)})`);
+  const handleMapClick = (coords: [number, number]) => {
+    setCoordinates(coords);
+    
+    // Show loading state
+    setIsSearching(true);
+    setShowSearchResults(false); // Hide search results when map is clicked
+    
+    // Reverse geocode to get location name
+    const reverseGeocode = async () => {
+      try {
+        const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+        const [lng, lat] = coords;
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            setLocation(data.features[0].place_name);
+            // Clear search query to show the selected location clearly
+            setSearchQuery('');
+          } else {
+            setLocation(`Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error reverse geocoding:', error);
+        const [lng, lat] = coords;
+        setLocation(`Location at ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+    
+    reverseGeocode();
   };
 
   // Navigate between steps
@@ -173,62 +214,75 @@ export default function AddEntryPage() {
     e.preventDefault()
     setIsSubmitting(true)
     
+    if (!selectedFile) {
+      alert('Please select an image');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setShowSuccessModal(true); // Show modal immediately in loading state
+    
     try {
-      // Get the API URL from environment variables
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
-      
-      if (!API_URL) {
-        throw new Error('API URL is not defined');
-      }
-      
-      if (!selectedFile) {
-        throw new Error('Please select an image');
-      }
-      
-      // Create form data for multipart/form-data submission
+      // Create FormData object
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
       formData.append('location', location);
       formData.append('coordinates', JSON.stringify(coordinates));
       formData.append('severity', severity);
-      formData.append('user_id', '00472f53-73a0-4912-a79b-68407e5998e3'); 
       formData.append('image', selectedFile);
       
-      // Send the data to the backend API
-      const response = await fetch(`${API_URL}/api/entries`, {
-        method: 'POST',
-        body: formData,
-      });
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          // Increase progress by random amount between 5-15%
+          // but cap at 90% until we get the actual response
+          const increment = Math.random() * 10 + 5;
+          const newProgress = Math.min(prev + increment, 90);
+          return newProgress;
+        });
+      }, 800);
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
-      }
+      // Send to API using the api.ts function
+      const data = await createEntry(formData);
       
-      // Get the response data
-      const newEntry = await response.json();
+      // Clear interval and set to 100%
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       
-      // Store the submitted entry for display in success modal
-      setSubmittedEntry(newEntry);
+      // Short delay to show 100% complete
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setIsSubmitting(false)
-      setIsSuccess(true)
-      setShowSuccessModal(true)
+      // Set success state
+      setIsSuccess(true);
+      setSubmittedEntry(data);
+      
+      // Reset form after successful submission
+      setTitle('');
+      setDescription('');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setCurrentStep(1);
+      
     } catch (error) {
-      console.error('Error submitting entry:', error);
-      alert(`Failed to submit entry: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error submitting form:', error);
+      alert('Failed to submit the form. Please try again.');
+      setShowSuccessModal(false); // Hide modal on error
+    } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="flex flex-col w-full max-w-3xl mx-auto p-4 pt-20 pb-24 md:pt-24 md:pb-8">
       {/* Success Modal */}
-      {submittedEntry && (
+      {showSuccessModal && (
         <SuccessModal 
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
           entry={submittedEntry}
+          isLoading={isSubmitting}
+          progress={uploadProgress}
         />
       )}
       <h1 className="text-2xl font-bold text-foreground mb-2">Report a Road Crack</h1>
@@ -354,73 +408,98 @@ export default function AddEntryPage() {
 
         {/* Step 2: Pin Location */}
         {currentStep === 2 && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="h-80 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 mb-4">
-              <Map 
-                initialCenter={coordinates}
-                zoom={15}
-                markers={[{ position: coordinates }]}
-                onMapClick={handleMapClick}
-                interactive={true}
-              />
+          <div className="space-y-6 animate-fadeIn" ref={mapContainer}>
+            {/* Map with floating search bar */}
+            <div className="relative">
+              <div className="h-80 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800 mb-4">
+                <Map 
+                  initialCenter={coordinates}
+                  zoom={15}
+                  markers={location ? [{ position: coordinates, severity: 'major' }] : []}
+                  onMapClick={handleMapClick}
+                  interactive={true}
+                />
+              </div>
+              
+              {/* Floating search box */}
+              <div className="absolute top-4 left-0 right-0 mx-auto w-full max-w-sm px-4">
+                <div className="relative w-full bg-white dark:bg-gray-900 rounded-md shadow-md border border-gray-300 dark:border-gray-700">
+                  <div className="flex items-center p-2">
+                    <MapPin className="ml-1 text-dalan-yellow" size={16} />
+                    <input
+                      id="search-location"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setShowSearchResults(true)}
+                      className="w-full p-1 pl-2 bg-white dark:bg-gray-900 border-none focus:ring-0 focus:outline-none text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                      placeholder="Search for a location..."
+                    />
+                    {searchQuery && (
+                      <button 
+                        onClick={() => {
+                          setSearchQuery('');
+                          setShowSearchResults(false);
+                        }}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <X size={14} className="text-gray-500 dark:text-gray-400" />
+                      </button>
+                    )}
+                    {isSearching && (
+                      <Loader className="mr-2 text-dalan-yellow animate-spin" size={16} />
+                    )}
+                  </div>
+                  
+                  {/* Search results dropdown */}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-900 shadow-md rounded-md border border-gray-300 dark:border-gray-700 max-h-60 overflow-auto">
+                      {searchResults.map((result, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm flex items-center border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                          onClick={() => handleSelectSearchResult(result)}
+                        >
+                          <MapPin className="mr-2 flex-shrink-0 text-dalan-yellow" size={14} />
+                          <span className="text-gray-900 dark:text-white">{result.place_name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             
             <div className="space-y-2">
-              <label htmlFor="location" className="block text-sm font-medium">Location</label>
-              <div className="relative">
-                <input
-                  id="search-location"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => searchQuery && setShowSearchResults(true)}
-                  className="w-full p-2 pl-10 rounded-md border border-gray-200 dark:border-gray-800 bg-background"
-                  placeholder="Search for a location..."
-                />
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-                {isSearching && (
-                  <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={16} />
-                )}
-                
-                {/* Search results dropdown */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 max-h-60 overflow-auto">
-                    {searchResults.map((result, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
-                        onClick={() => handleSelectSearchResult(result)}
-                      >
-                        {result.place_name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-2">
-                <p className="text-sm text-gray-500 mb-2">Selected location: <span className="font-medium">{location}</span></p>
-                <div className="flex space-x-2">
-                  <button 
-                    type="button" 
-                    onClick={getCurrentLocation}
-                    disabled={isGettingCurrentLocation}
-                    className="flex items-center text-xs px-3 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-                  >
-                    {isGettingCurrentLocation ? (
-                      <>
-                        <Loader size={12} className="mr-1 animate-spin" />
-                        Getting location...
-                      </>
-                    ) : (
-                      <>
-                        <Navigation size={12} className="mr-1" />
-                        Use my current location
-                      </>
-                    )}
-                  </button>
+              <div className="flex justify-between items-center mt-4">
+                <div>
+                  <p className="text-sm font-medium mb-1">Selected location:</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <span className="flex items-center">
+                      <MapPin size={14} className="mr-1 text-dalan-yellow" />
+                      {location || 'No location selected'}
+                    </span>
+                  </p>
                 </div>
+                <button 
+                  type="button" 
+                  onClick={getCurrentLocation}
+                  disabled={isGettingCurrentLocation}
+                  className="flex items-center text-sm px-3 py-2 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {isGettingCurrentLocation ? (
+                    <>
+                      <Loader size={14} className="mr-2 animate-spin" />
+                      Getting location...
+                    </>
+                  ) : (
+                    <>
+                      <Navigation size={14} className="mr-2" />
+                      Use my current location
+                    </>
+                  )}
+                </button>
               </div>
               
               <input

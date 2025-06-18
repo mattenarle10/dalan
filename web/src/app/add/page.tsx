@@ -15,53 +15,67 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 // Create a stable MapContainer component that won't remount when coordinates change
-const MapContainer = memo(({ coordinates, onCenterChanged }: { 
-  coordinates: [number, number], 
-  onCenterChanged: (coords: [number, number]) => void 
-}) => {
-  // Use ref to track if component is mounted to prevent state updates after unmount
-  const isMounted = useRef(true);
-  // Store initial coordinates to prevent remounting
-  const [initialCoords] = useState(coordinates);
-  // Create a ref to the Map component
+const MapContainer = memo(function MapContainer({ 
+  coordinates, 
+  onCenterChanged 
+}: { 
+  coordinates: [number, number]; 
+  onCenterChanged: (coords: [number, number]) => void;
+}) {
+  // Track if the map has been manually dragged
+  const hasBeenDragged = useRef(false);
+  
+  // Track last update timestamp to prevent duplicate updates
+  const lastUpdateTimestamp = useRef(0);
+  
+  // Create a ref for the map instance
   const mapRef = useRef<any>(null);
   
-  // Update map position when coordinates change without remounting
+  // Handle map center changes
+  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
+    // Prevent duplicate updates within a short time window
+    const now = Date.now();
+    if (now - lastUpdateTimestamp.current < 50) return;
+    lastUpdateTimestamp.current = now;
+    
+    // Mark that the map has been manually dragged
+    hasBeenDragged.current = true;
+    
+    // Notify parent component of center change
+    onCenterChanged(coords);
+  }, [onCenterChanged]);
+  
+  // Update map center when coordinates change
   useEffect(() => {
-    // Only update if map is initialized and coordinates have changed
-    if (mapRef.current && mapRef.current.isInitialized && mapRef.current.setCenter) {
-      mapRef.current.setCenter(coordinates);
-    }
+    // Skip updates if the map hasn't been initialized yet
+    if (!mapRef.current || !mapRef.current.mapInstance) return;
+    
+    // Skip programmatic updates if user has manually dragged the map
+    if (hasBeenDragged.current) return;
+    
+    // Fly to the new coordinates
+    mapRef.current.setCenter(coordinates);
   }, [coordinates]);
   
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-  
   return (
-    <Map
-      ref={mapRef}
-      initialCenter={initialCoords}
-      zoom={15}
-      interactive={true}
-      centerPin={true}
-      onCenterChanged={onCenterChanged}
-    />
+    <div className="w-full h-full relative">
+      <Map
+        ref={mapRef}
+        initialCenter={coordinates}
+        centerPin
+        onCenterChanged={handleMapCenterChanged}
+      />
+    </div>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for memo
-  // Only re-render if coordinates have changed significantly (more than 0.0001 degrees)
-  const [prevLng, prevLat] = prevProps.coordinates;
-  const [nextLng, nextLat] = nextProps.coordinates;
-  const lngDiff = Math.abs(prevLng - nextLng);
-  const latDiff = Math.abs(prevLat - nextLat);
-  
-  // Only re-render for significant changes to prevent unnecessary renders
-  return lngDiff < 0.0001 && latDiff < 0.0001;
+  // Only re-render if coordinates change significantly
+  return (
+    Math.abs(prevProps.coordinates[0] - nextProps.coordinates[0]) < 0.00001 &&
+    Math.abs(prevProps.coordinates[1] - nextProps.coordinates[1]) < 0.00001
+  );
 });
+
+// No longer using memo comparison function as it was causing issues with position updates
 
 export default function AddEntryPage() {
   
@@ -120,27 +134,20 @@ export default function AddEntryPage() {
     
     try {
       const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      
-      // Add proximity bias to current coordinates to prioritize nearby results
-      const [lng, lat] = coordinates;
-      const proximityParam = `&proximity=${lng},${lat}`;
-      
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5${proximityParam}`
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5`
       );
       
-      if (!response.ok) {
-        throw new Error('Geocoding request failed');
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.features || []);
+        
+        // Don't auto-select the first result - wait for user to explicitly select a result
+        // Only show the search results for the user to choose from
+      } else {
+        console.error('Error searching for location:', response.statusText);
+        setSearchResults([]);
       }
-      
-      const data = await response.json();
-      
-      // Filter out results with no coordinates
-      const validResults = data.features.filter((feature: any) => 
-        feature.center && feature.center.length === 2
-      );
-      
-      setSearchResults(validResults);
     } catch (error) {
       console.error('Error searching for location:', error);
       setSearchResults([]);
@@ -148,7 +155,7 @@ export default function AddEntryPage() {
       setIsSearching(false);
     }
   };
-  
+
   // Debounce search to avoid too many API calls
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -160,26 +167,47 @@ export default function AddEntryPage() {
   
   // Function to select a location from search results
   const handleSelectSearchResult = (result: {place_name: string, center: [number, number]}) => {
-    // Set location and coordinates
+    // Update location state with the selected place name
     setLocation(result.place_name);
+    
+    // Update coordinates with the selected location's coordinates
     setCoordinates(result.center);
     
-    // Clear UI state
+    // Clear search results and query
+    setSearchResults([]);
     setShowSearchResults(false);
     setSearchQuery('');
     
-    // Provide visual feedback that a location was selected
-    console.log(`Selected location: ${result.place_name}`);
-    
-    // Focus on the map to show the user their selection
+    // Scroll to map if needed
     if (mapContainer.current) {
-      // Short delay to allow state to update before scrolling
-      setTimeout(() => {
-        mapContainer.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
+      mapContainer.current.scrollIntoView({ behavior: 'smooth' });
     }
+    
+    // Provide visual feedback that the location has been selected
+    const feedbackEl = document.createElement('div');
+    feedbackEl.className = 'location-selected-feedback';
+    feedbackEl.style.position = 'absolute';
+    feedbackEl.style.top = '50%';
+    feedbackEl.style.left = '50%';
+    feedbackEl.style.transform = 'translate(-50%, -50%)';
+    feedbackEl.style.backgroundColor = 'rgba(255, 203, 20, 0.7)';
+    feedbackEl.style.borderRadius = '50%';
+    feedbackEl.style.width = '60px';
+    feedbackEl.style.height = '60px';
+    feedbackEl.style.animation = 'pulse 0.5s ease-out';
+    if (mapContainer.current) {
+      mapContainer.current.appendChild(feedbackEl);
+      setTimeout(() => {
+        if (mapContainer.current && mapContainer.current.contains(feedbackEl)) {
+          mapContainer.current.removeChild(feedbackEl);
+        }
+      }, 500);
+    }
+    
+    // Update current step to 2 (location selection)
+    setCurrentStep(2);
   };
-  
+
   // Function to get current location
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -228,10 +256,15 @@ export default function AddEntryPage() {
   
   // Function to handle map center changed (when user drags the map)
   const handleMapCenterChanged = (coords: [number, number]) => {
+    console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
+    
     // Update coordinates state
+    console.log('[AddEntryPage] Previous coordinates:', coordinates);
     setCoordinates(coords);
+    console.log('[AddEntryPage] Updated coordinates state');
     
     // Show loading state
+    console.log('[AddEntryPage] Setting loading states');
     setIsSearching(true);
     setShowSearchResults(false); // Hide search results when map is dragged
     
@@ -239,43 +272,86 @@ export default function AddEntryPage() {
     const [lng, lat] = coords;
     
     // Immediately set a temporary location name while we fetch the actual name
-    setLocation(`Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    const tempLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    console.log('[AddEntryPage] Setting temporary location:', tempLocation);
+    setLocation(tempLocation);
+    
+    // Store the last drag timestamp to prevent race conditions
+    const dragTimestamp = Date.now();
+    const prevTimestamp = handleMapCenterChanged.lastDragTimestamp || 0;
+    console.log('[AddEntryPage] Updating drag timestamp from', prevTimestamp, 'to', dragTimestamp);
+    handleMapCenterChanged.lastDragTimestamp = dragTimestamp;
     
     // Debounce the reverse geocoding to avoid too many API calls while dragging
+    console.log('[AddEntryPage] Setting debounce timeout for reverse geocoding');
     const debounceTimeout = setTimeout(() => {
+      console.log('[AddEntryPage] Debounce timeout fired, timestamp check:', 
+        dragTimestamp === handleMapCenterChanged.lastDragTimestamp ? 'MATCH' : 'OUTDATED');
+      
+      // Only proceed if this is still the most recent drag event
+      if (dragTimestamp !== handleMapCenterChanged.lastDragTimestamp) {
+        console.log('[AddEntryPage] Skipping outdated reverse geocode request');
+        return;
+      }
+      
       // Reverse geocode to get location name
+      console.log('[AddEntryPage] Starting reverse geocoding for:', coords);
       const reverseGeocode = async () => {
+        console.log('[AddEntryPage] Inside reverseGeocode function for:', [lng, lat]);
         try {
           const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+          console.log('[AddEntryPage] Fetching from Mapbox Geocoding API');
           const response = await fetch(
             `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
           );
           
           if (response.ok) {
+            console.log('[AddEntryPage] Geocoding API response received successfully');
             const data = await response.json();
+            console.log('[AddEntryPage] Geocoding data:', data);
+            
             if (data.features && data.features.length > 0) {
               // Get the most relevant place name
               const placeName = data.features[0].place_name;
+              console.log('[AddEntryPage] Setting location to:', placeName);
               setLocation(placeName);
               
               // Clear search query to show the selected location clearly
+              console.log('[AddEntryPage] Clearing search query');
               setSearchQuery('');
+            } else {
+              // If no results, just show coordinates
+              const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+              console.log('[AddEntryPage] No features found, using fallback:', fallbackLocation);
+              setLocation(fallbackLocation);
             }
+          } else {
+            console.error('[AddEntryPage] Geocoding API response not OK:', response.status);
+            throw new Error('Failed to fetch location data');
           }
         } catch (error) {
-          console.error('Error reverse geocoding:', error);
-          // Keep the temporary location name that was already set
+          console.error('[AddEntryPage] Error in reverse geocoding:', error);
+          // Fallback to showing coordinates
+          const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          console.log('[AddEntryPage] Setting fallback location after error:', fallbackLocation);
+          setLocation(fallbackLocation);
         } finally {
+          // Hide loading state
+          console.log('[AddEntryPage] Finished reverse geocoding, hiding loading state');
           setIsSearching(false);
         }
       };
       
-      // Start the reverse geocoding process
+      // Execute the reverse geocoding
+      console.log('[AddEntryPage] Executing reverseGeocode function');
       reverseGeocode();
     }, 300); // Wait 300ms after dragging stops before geocoding
     
     return () => clearTimeout(debounceTimeout);
   };
+
+  // Add a static property to store the last drag timestamp
+  handleMapCenterChanged.lastDragTimestamp = 0;
 
   // Navigate between steps
   const goToNextStep = () => {

@@ -36,8 +36,12 @@ const Map = forwardRef(({
   const mapInstance = useRef<MapboxMap | null>(null);
   const [mapInitialized, setMapInitialized] = useState(false);
 
+  // Track if event handlers have been set up to prevent duplicates
+  const eventHandlersSetup = useRef(false);
+  
   // Initialize map when component mounts
   useEffect(() => {
+    // Prevent multiple initializations of the same map
     if (mapInstance.current || !mapContainer.current) return;
     
     let isMounted = true;
@@ -79,7 +83,7 @@ const Map = forwardRef(({
           if (map._requestManager) {
             // @ts-ignore
             map._requestManager.errorCallback = () => {
-              console.warn('Handled map error');
+              // Silently handle Mapbox internal errors
               return true; // Prevent uncaught error
             };
           }
@@ -110,24 +114,9 @@ const Map = forwardRef(({
             // Change cursor to pointer when hovering over map
             map.getCanvas().style.cursor = 'pointer';
           }
-          
-          // Add move end event handler if centerPin and onCenterChanged are provided
-          if (centerPin && onCenterChanged) {
-            // Initial call to set the location based on the initial center
-            setTimeout(() => {
-              const center = map.getCenter();
-              onCenterChanged([center.lng, center.lat]);
-            }, 500);
-            
-            // Update when map movement ends
-            map.on('moveend', () => {
-              const center = map.getCenter();
-              onCenterChanged([center.lng, center.lat]);
-            });
-          }
         }
       } catch (error) {
-        console.error('Error initializing Mapbox map:', error);
+        console.error('Error initializing map:', error);
       }
     };
     
@@ -139,9 +128,93 @@ const Map = forwardRef(({
       if (mapInstance.current) {
         mapInstance.current.remove();
         mapInstance.current = null;
+        eventHandlersSetup.current = false;
       }
     };
-  }, [initialCenter, interactive, onMapClick, zoom, centerPin, onCenterChanged]); // Include dependencies used in the effect
+  }, []); // Empty dependency array to ensure map only initializes once
+  
+  // Set up event handlers separately after map is initialized
+  useEffect(() => {
+    // Only proceed if map is initialized and handlers aren't already set up
+    if (!mapInitialized || !mapInstance.current || !centerPin || !onCenterChanged) return;
+    
+    // Skip if event handlers are already set up
+    if (eventHandlersSetup.current) return;
+    
+    // Mark that we're setting up event handlers
+    eventHandlersSetup.current = true;
+    
+    const map = mapInstance.current;
+    
+    // Store the dragging state to prevent position resets
+    let isDragging = false;
+    let userHasDragged = false;
+    
+    // Initial call to set the location based on the initial center
+    setTimeout(() => {
+      const center = map.getCenter();
+      onCenterChanged([center.lng, center.lat]);
+    }, 500);
+    
+    // Track when dragging starts
+    map.on('dragstart', () => {
+      isDragging = true;
+      userHasDragged = true;
+      
+      // Ensure smooth dragging without TypeScript errors
+      const mapAny = map as any;
+      if (mapAny.dragPan && typeof mapAny.dragPan === 'object') {
+        // Prevent the map from jumping back during drag
+        mapAny.dragPan._ignoreEvent = false;
+      }
+    });
+    
+    // Track when dragging ends and update position
+    map.on('dragend', () => {
+      isDragging = false;
+      const center = map.getCenter();
+      
+      // Force update position after drag
+      onCenterChanged([center.lng, center.lat]);
+    });
+    
+    // Track if the movement was caused by zoom
+    let isZooming = false;
+    
+    // Detect zoom start
+    map.on('zoomstart', () => {
+      console.log('[Map] Zoom started - will not update coordinates');
+      isZooming = true;
+    });
+    
+    // Detect zoom end
+    map.on('zoomend', () => {
+      console.log('[Map] Zoom ended - coordinates preserved');
+      isZooming = false;
+    });
+    
+    // Update when map movement ends (zoom, fly, etc.)
+    map.on('moveend', () => {
+      // Skip coordinate updates completely if this was a zoom operation
+      if (isZooming) {
+        console.log('[Map] Moveend from zoom - ignoring coordinate update');
+        return;
+      }
+      
+      // Only update coordinates for non-zoom movements (drag, fly, etc.)
+      // and only when not currently dragging (to avoid duplicate updates)
+      if (!isDragging) {
+        const center = map.getCenter();
+        console.log('[Map] Updating center after non-zoom moveend:', [center.lng, center.lat]);
+        onCenterChanged([center.lng, center.lat]);
+      }
+    });
+    
+    // Return cleanup function
+    return () => {
+      // No need to remove event handlers as they'll be cleaned up when the map is removed
+    };
+  }, [mapInitialized, centerPin, onCenterChanged]); // Include dependencies used in the effect
   
   // Handle markers separately after map is initialized
   useEffect(() => {

@@ -29,7 +29,7 @@ const MapContainer = memo(function MapContainer({
   const lastUpdateTimestamp = useRef(0);
   
   // Create a ref for the map instance
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<{ mapInstance: mapboxgl.Map | null; setCenter: (coords: [number, number]) => void; getCenter: () => [number, number]; isInitialized: () => boolean; } | null>(null);
   
   // Handle map center changes
   const handleMapCenterChanged = useCallback((coords: [number, number]) => {
@@ -41,8 +41,8 @@ const MapContainer = memo(function MapContainer({
     // Mark that the map has been manually dragged
     hasBeenDragged.current = true;
     
-    // Notify parent component of center change
-    onCenterChanged(coords);
+    // Notify parent component of center change with a slight delay to ensure UI updates
+    setTimeout(() => onCenterChanged(coords), 0);
   }, [onCenterChanged]);
   
   // Update map center when coordinates change
@@ -90,7 +90,7 @@ export default function AddEntryPage() {
   
   // State for location search
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<Array<{ place_name: string; center: [number, number] }>>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false);
@@ -254,11 +254,14 @@ export default function AddEntryPage() {
     );
   };  
   
+  // Create a ref to store the last drag timestamp (instead of attaching to function)
+  const lastDragTimestampRef = useRef(0);
+
   // Function to handle map center changed (when user drags the map)
-  const handleMapCenterChanged = (coords: [number, number]) => {
+  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
     console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
     
-    // Update coordinates state
+    // Update coordinates state - ensure we update this immediately
     console.log('[AddEntryPage] Previous coordinates:', coordinates);
     setCoordinates(coords);
     console.log('[AddEntryPage] Updated coordinates state');
@@ -278,18 +281,18 @@ export default function AddEntryPage() {
     
     // Store the last drag timestamp to prevent race conditions
     const dragTimestamp = Date.now();
-    const prevTimestamp = handleMapCenterChanged.lastDragTimestamp || 0;
+    const prevTimestamp = lastDragTimestampRef.current || 0;
     console.log('[AddEntryPage] Updating drag timestamp from', prevTimestamp, 'to', dragTimestamp);
-    handleMapCenterChanged.lastDragTimestamp = dragTimestamp;
+    lastDragTimestampRef.current = dragTimestamp;
     
     // Debounce the reverse geocoding to avoid too many API calls while dragging
     console.log('[AddEntryPage] Setting debounce timeout for reverse geocoding');
     const debounceTimeout = setTimeout(() => {
       console.log('[AddEntryPage] Debounce timeout fired, timestamp check:', 
-        dragTimestamp === handleMapCenterChanged.lastDragTimestamp ? 'MATCH' : 'OUTDATED');
+        dragTimestamp === lastDragTimestampRef.current ? 'MATCH' : 'OUTDATED');
       
       // Only proceed if this is still the most recent drag event
-      if (dragTimestamp !== handleMapCenterChanged.lastDragTimestamp) {
+      if (dragTimestamp !== lastDragTimestampRef.current) {
         console.log('[AddEntryPage] Skipping outdated reverse geocode request');
         return;
       }
@@ -311,6 +314,10 @@ export default function AddEntryPage() {
             console.log('[AddEntryPage] Geocoding data:', data);
             
             if (data.features && data.features.length > 0) {
+              // Clear all event listeners
+              clearTimeout(debounceTimeout);
+              lastDragTimestampRef.current = 0;
+              console.log('[AddEntryPage] Clearing state');
               // Get the most relevant place name
               const placeName = data.features[0].place_name;
               console.log('[AddEntryPage] Setting location to:', placeName);
@@ -346,12 +353,9 @@ export default function AddEntryPage() {
       console.log('[AddEntryPage] Executing reverseGeocode function');
       reverseGeocode();
     }, 300); // Wait 300ms after dragging stops before geocoding
-    
-    return () => clearTimeout(debounceTimeout);
-  };
+  }, [coordinates, setCoordinates, setLocation, setSearchQuery, setShowSearchResults, setIsSearching]);
 
-  // Add a static property to store the last drag timestamp
-  handleMapCenterChanged.lastDragTimestamp = 0;
+  // lastDragTimestampRef is already used instead of static property
 
   // Navigate between steps
   const goToNextStep = () => {
@@ -388,6 +392,8 @@ export default function AddEntryPage() {
       formData.append('coordinates', JSON.stringify(coordinates));
       formData.append('severity', severity);
       formData.append('image', selectedFile);
+      // Add user_id - using a default value if not available
+      formData.append('user_id', '1'); // Use appropriate user ID from your auth system
       
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -624,7 +630,7 @@ export default function AddEntryPage() {
                         >
                           <MapPin className="mr-3 flex-shrink-0 text-foreground mt-1" size={16} />
                           <div className="flex flex-col">
-                            <span className="font-medium text-foreground">{result.text || result.place_name.split(',')[0]}</span>
+                            <span className="font-medium text-foreground">{result.place_name.split(',')[0]}</span>
                             <span className="text-xs text-muted-foreground mt-0.5">{result.place_name}</span>
                           </div>
                         </button>

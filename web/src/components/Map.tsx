@@ -79,9 +79,9 @@ const Map = forwardRef(({
         // Add error handler to prevent uncaught errors
         map.on('load', () => {
           // Override the default error handler
-          // @ts-ignore - Accessing internal property to prevent errors
+          // Access internal property to prevent errors
           if (map._requestManager) {
-            // @ts-ignore
+            // @ts-expect-error - Silently handle Mapbox internal errors
             map._requestManager.errorCallback = () => {
               // Silently handle Mapbox internal errors
               return true; // Prevent uncaught error
@@ -131,7 +131,7 @@ const Map = forwardRef(({
         eventHandlersSetup.current = false;
       }
     };
-  }, []); // Empty dependency array to ensure map only initializes once
+  }, [initialCenter, zoom, interactive, onMapClick, centerPin, onCenterChanged]); // Include all dependencies
   
   // Set up event handlers separately after map is initialized
   useEffect(() => {
@@ -148,7 +148,6 @@ const Map = forwardRef(({
     
     // Store the dragging state to prevent position resets
     let isDragging = false;
-    let userHasDragged = false;
     
     // Initial call to set the location based on the initial center
     setTimeout(() => {
@@ -159,10 +158,8 @@ const Map = forwardRef(({
     // Track when dragging starts
     map.on('dragstart', () => {
       isDragging = true;
-      userHasDragged = true;
-      
       // Ensure smooth dragging without TypeScript errors
-      const mapAny = map as any;
+      const mapAny = map as MapboxMap & { dragPan?: { _ignoreEvent: boolean } };
       if (mapAny.dragPan && typeof mapAny.dragPan === 'object') {
         // Prevent the map from jumping back during drag
         mapAny.dragPan._ignoreEvent = false;
@@ -189,8 +186,17 @@ const Map = forwardRef(({
     
     // Detect zoom end
     map.on('zoomend', () => {
-      console.log('[Map] Zoom ended - coordinates preserved');
+      console.log('[Map] Zoom ended - coordinates will update');
       isZooming = false;
+      
+      // Get current center after zoom operation
+      if (!isDragging && onCenterChanged) {
+        const center = map.getCenter();
+        // Only update position if we're not currently dragging
+        if (!isZooming) {
+          onCenterChanged([center.lng, center.lat]);
+        }
+      }
     });
     
     // Update when map movement ends (zoom, fly, etc.)
@@ -260,7 +266,7 @@ const Map = forwardRef(({
             
             // Create and add the marker
             try {
-              const mapMarker = new mapboxgl.Marker(el)
+              new mapboxgl.Marker(el)
                 .setLngLat(marker.position)
                 .addTo(map);
               
@@ -321,7 +327,7 @@ const Map = forwardRef(({
     },
     // Method to check if map is initialized
     isInitialized: () => mapInitialized
-  }), [mapInitialized]);
+  }), [mapInitialized, initialCenter]);
 
   return (
     <div className="relative w-full h-full">
@@ -347,4 +353,7 @@ const Map = forwardRef(({
 });
 
 // Export the Map component
+// Add displayName to satisfy the linter
+Map.displayName = 'Map';
+
 export default Map;

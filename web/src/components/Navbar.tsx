@@ -24,6 +24,12 @@ export default function Navbar() {
       document.documentElement.classList.add('dark')
     }
   }, [])
+  
+  // Use state for client-side rendering to prevent hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <>
@@ -62,7 +68,7 @@ export default function Navbar() {
           <div className="flex items-center justify-around h-16">
             <Link href="/dashboard" className="flex flex-col items-center p-1 rounded-lg hover:bg-muted/60 transition-colors">
               <Grid size={22} className="text-foreground mb-0.5" />
-              <span className="text-xs font-medium">Dashboard</span>
+              <span className="text-xs font-medium">{mounted ? 'Dashboard' : 'Home'}</span>
             </Link>
             <Link href="/add" className="flex flex-col items-center p-1 rounded-lg hover:bg-muted/60 transition-colors">
               <LocationPlus size={22} className="text-foreground mb-0.5" />
@@ -74,7 +80,7 @@ export default function Navbar() {
             </Link>
             <Link href="/auth" className="flex flex-col items-center p-1 rounded-lg hover:bg-muted/60 transition-colors">
               <UserCircle size={22} className="text-foreground mb-0.5" />
-              <span className="text-xs font-medium">Profile</span>
+              <span className="text-xs font-medium">{mounted ? 'Profile' : 'Account'}</span>
             </Link>
           </div>
         </div>
@@ -98,7 +104,7 @@ export default function Navbar() {
                 className="flex items-center px-3 py-2 rounded-md hover:bg-muted/60 transition-colors text-sm font-medium"
               >
                 <Grid size={18} className="text-foreground mr-1.5" />
-                <span>Dashboard</span>
+                <span>{mounted ? 'Dashboard' : 'Home'}</span>
               </Link>
               <Link 
                 href="/add" 
@@ -119,7 +125,7 @@ export default function Navbar() {
                 className="flex items-center px-3 py-2 rounded-md hover:bg-muted/60 transition-colors text-sm font-medium"
               >
                 <UserCircle size={18} className="text-foreground mr-1.5" />
-                <span>Profile</span>
+                <span>{mounted ? 'Profile' : 'Account'}</span>
               </Link>
             </div>
             

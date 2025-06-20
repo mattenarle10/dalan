@@ -3,7 +3,7 @@
 import { X, MapPin, CheckCircle, ArrowRight, Loader, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { RoadCrackEntry, SuccessModalProps } from '@/lib/interface'
+import { SuccessModalProps } from '@/lib/interface'
 
 export default function SuccessModal({ isOpen, onClose, entry, isLoading = false, progress = 0 }: SuccessModalProps) {
   const router = useRouter()
@@ -70,7 +70,7 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
               </div>
               
               <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-2 text-center">
-                <p>Please don't close this window while processing.</p>
+                <p>Please don&apos;t close this window while processing.</p>
               </div>
             </div>
           </div>

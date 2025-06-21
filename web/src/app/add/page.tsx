@@ -22,38 +22,44 @@ const MapContainer = memo(function MapContainer({
   coordinates: [number, number]; 
   onCenterChanged: (coords: [number, number]) => void;
 }) {
-  // Track if the map has been manually dragged
-  const hasBeenDragged = useRef(false);
-  
-  // Track last update timestamp to prevent duplicate updates
-  const lastUpdateTimestamp = useRef(0);
-  
   // Create a ref for the map instance
-  const mapRef = useRef<{ mapInstance: mapboxgl.Map | null; setCenter: (coords: [number, number]) => void; getCenter: () => [number, number]; isInitialized: () => boolean; } | null>(null);
+  const mapRef = useRef<{
+    mapInstance: mapboxgl.Map | null;
+    setCenter: (coordinates: [number, number]) => void;
+    getCenter: () => [number, number];
+    isInitialized: () => boolean;
+    addMarkers: (markers: Array<{ coordinates: [number, number], element?: HTMLElement, popup?: { content: string, offset?: number } }>) => void;
+  }>(null);
   
-  // Handle map center changes
+  // Use a ref to track the last update time to prevent update loops
+  const lastUpdateTime = useRef<number>(0);
+  
+  // This function handles map center changes when the user drags the map
   const handleMapCenterChanged = useCallback((coords: [number, number]) => {
-    // Prevent duplicate updates within a short time window
+    // Get current timestamp
     const now = Date.now();
-    if (now - lastUpdateTimestamp.current < 50) return;
-    lastUpdateTimestamp.current = now;
     
-    // Mark that the map has been manually dragged
-    hasBeenDragged.current = true;
+    // Simple debounce - ignore updates that are too close together (50ms)
+    if (now - lastUpdateTime.current < 50) return;
     
-    // Notify parent component of center change with a slight delay to ensure UI updates
-    setTimeout(() => onCenterChanged(coords), 0);
+    // Update the timestamp
+    lastUpdateTime.current = now;
+    
+    // Log the coordinates for debugging
+    console.log('[MapContainer] Map center changed:', coords);
+    
+    // Always update parent component immediately with new coordinates
+    onCenterChanged(coords);
   }, [onCenterChanged]);
   
-  // Update map center when coordinates change
+  // This effect handles external coordinate changes (like from search results)
   useEffect(() => {
-    // Skip updates if the map hasn't been initialized yet
-    if (!mapRef.current || !mapRef.current.mapInstance) return;
+    // Only proceed if map is initialized
+    if (!mapRef.current || !mapRef.current.isInitialized()) return;
     
-    // Skip programmatic updates if user has manually dragged the map
-    if (hasBeenDragged.current) return;
+    console.log('[MapContainer] Coordinates changed externally:', coordinates);
     
-    // Fly to the new coordinates
+    // Always update the map position when coordinates change from parent
     mapRef.current.setCenter(coordinates);
   }, [coordinates]);
   
@@ -67,13 +73,7 @@ const MapContainer = memo(function MapContainer({
       />
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Only re-render if coordinates change significantly
-  return (
-    Math.abs(prevProps.coordinates[0] - nextProps.coordinates[0]) < 0.00001 &&
-    Math.abs(prevProps.coordinates[1] - nextProps.coordinates[1]) < 0.00001
-  );
-});
+});  // Remove memo comparison function to ensure updates are always processed
 
 // No longer using memo comparison function as it was causing issues with position updates
 

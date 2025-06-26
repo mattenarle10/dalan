@@ -1,6 +1,6 @@
-# 🛣️ Dalan — AI-Powered Road Crack Mapping App
+# Dalan — AI-Powered Road Crack Mapping App
 
-**Dalan** is a crowdsourced web application that allows users to upload road images, automatically classify the type of crack using AI, and pin the report to a map. Designed to help monitor and maintain road infrastructure through community-powered data.
+**Dalan 🛣 ** is a crowdsourced web application that allows users to upload road images, automatically classify the type of crack using AI, and pin the report to a map. Designed to help monitor and maintain road infrastructure through community-powered data.
 
 **Made by Matthew Enarle and Alecxander Jamille Andaya**
 

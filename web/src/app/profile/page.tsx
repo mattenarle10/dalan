@@ -25,7 +25,8 @@ export default function ProfilePage() {
 
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
+    <main className="flex min-h-screen flex-col items-center justify-between p-4 pt-22 pb-24 md:pt-24 md:pb-8">
+      <div className="container mx-auto max-w-4xl w-full">
       <div className="flex justify-center">
         <div className="w-full md:w-3/4 bg-background border border-border rounded-lg shadow-sm overflow-hidden">
           {/* Header */}
@@ -108,6 +109,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </main>
   );
 }

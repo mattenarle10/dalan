@@ -22,7 +22,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-start pt-10 md:pt-20 px-4 md:px-6 pb-4 min-h-screen bg-background">
+    <main className="flex min-h-screen flex-col items-center justify-between p-4 pt-26 pb-24 md:pt-24 md:pb-8 bg-background">
       
       {/* Auth container */}
       <div className="w-full max-w-md mx-auto">
@@ -151,6 +151,6 @@ export default function AuthPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

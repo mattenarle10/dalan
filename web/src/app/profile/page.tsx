@@ -18,7 +18,8 @@ export default function ProfilePage() {
   // Simple handler for sign out button
   const handleSignOut = () => {
     console.log("Sign out clicked (demo only)");
-    // No toast, just a console log for demo
+    // Redirect to landing page
+    window.location.href = "/";
   };
 
 
@@ -71,7 +72,7 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-sm flex justify-between text-foreground">
                   <span className="text-muted-foreground">Member since:</span> 
-                  <span>{user.memberSince}</span>
+                  <span>{new Date(user.memberSince).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
                 </p>
               </div>
               

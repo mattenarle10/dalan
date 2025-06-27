@@ -25,7 +25,7 @@ const MapContainer = memo(function MapContainer({
   // Create a ref for the map instance
   const mapRef = useRef<{
     mapInstance: mapboxgl.Map | null;
-    setCenter: (coordinates: [number, number]) => void;
+    setCenter: (coordinates: [number, number], updateCamera?: boolean) => void;
     getCenter: () => [number, number];
     isInitialized: () => boolean;
     addMarkers: (markers: Array<{ coordinates: [number, number], element?: HTMLElement, popup?: { content: string, offset?: number } }>) => void;
@@ -33,34 +33,118 @@ const MapContainer = memo(function MapContainer({
   
   // Use a ref to track the last update time to prevent update loops
   const lastUpdateTime = useRef<number>(0);
+  const lastCoordinates = useRef<[number, number]>(coordinates);
+  const isDragging = useRef<boolean>(false);
   
   // This function handles map center changes when the user drags the map
   const handleMapCenterChanged = useCallback((coords: [number, number]) => {
+    // Only update if dragging (user initiated) or if it's an external update
+    if (!isDragging.current && 
+        lastCoordinates.current[0] === coords[0] && 
+        lastCoordinates.current[1] === coords[1]) {
+      return;
+    }
+    
     // Get current timestamp
     const now = Date.now();
     
-    // Simple debounce - ignore updates that are too close together (50ms)
-    if (now - lastUpdateTime.current < 50) return;
+    // Skip updates that are too close together (rate limiting)
+    if (now - lastUpdateTime.current < 30) return;
     
-    // Update the timestamp
+    // Update the timestamp and last coordinates
     lastUpdateTime.current = now;
+    lastCoordinates.current = [...coords];
     
     // Log the coordinates for debugging
     console.log('[MapContainer] Map center changed:', coords);
     
-    // Always update parent component immediately with new coordinates
-    onCenterChanged(coords);
+    // Update parent component with the new coordinates - force a new array to trigger React updates
+    onCenterChanged([...coords]);
+  }, [onCenterChanged]);
+  
+  // Setup drag tracking
+  useEffect(() => {
+    if (!mapRef.current || !mapRef.current.isInitialized() || !mapRef.current.mapInstance) return;
+    
+    const map = mapRef.current.mapInstance;
+    
+    // Track when map is being dragged
+    const onDragStart = () => {
+      console.log('[MapContainer] Drag started');
+      isDragging.current = true;
+    };
+    
+    const onDrag = () => {
+      if (!isDragging.current) return;
+      
+      // Get current position during drag
+      const center = map.getCenter();
+      const currentCoords: [number, number] = [center.lng, center.lat];
+      
+      // Update last coordinates and notify parent immediately
+      lastCoordinates.current = [...currentCoords];
+      
+      // Log the drag position for debugging
+      console.log('[MapContainer] Drag position:', currentCoords);
+      
+      // Notify parent immediately about position change during drag
+      requestAnimationFrame(() => {
+        onCenterChanged([...currentCoords]);
+      });
+    };
+    
+    const onDragEnd = () => {
+      console.log('[MapContainer] Drag ended');
+      isDragging.current = false;
+      
+      // Get final position
+      const center = map.getCenter();
+      const finalCoords: [number, number] = [center.lng, center.lat];
+      console.log('[MapContainer] Final drag position:', finalCoords);
+      
+      // Update last coordinates
+      lastCoordinates.current = [...finalCoords];
+      
+      // Notify parent
+      onCenterChanged([...finalCoords]);
+    };
+    
+    // Add event listeners
+    map.on('dragstart', onDragStart);
+    map.on('drag', onDrag);
+    map.on('dragend', onDragEnd);
+    
+    return () => {
+      // Clean up event listeners
+      map.off('dragstart', onDragStart);
+      map.off('drag', onDrag);
+      map.off('dragend', onDragEnd);
+    };
   }, [onCenterChanged]);
   
   // This effect handles external coordinate changes (like from search results)
   useEffect(() => {
+    // Skip if coordinates are the same as last tracked (prevent loops)
+    if (lastCoordinates.current[0] === coordinates[0] && lastCoordinates.current[1] === coordinates[1]) {
+      return;
+    }
+    
+    // Update the last coordinates to avoid loops
+    lastCoordinates.current = [...coordinates];
+    
     // Only proceed if map is initialized
     if (!mapRef.current || !mapRef.current.isInitialized()) return;
     
-    console.log('[MapContainer] Coordinates changed externally:', coordinates);
+    console.log('[MapContainer] External coordinate update:', coordinates);
     
-    // Always update the map position when coordinates change from parent
-    mapRef.current.setCenter(coordinates);
+    // Only if not currently dragging (user triggered)
+    if (!isDragging.current) {
+      // For external updates (search results), we want to move the camera
+      mapRef.current.setCenter(coordinates, true);
+    } else {
+      // For user drag updates, only update pin position, not camera
+      mapRef.current.setCenter(coordinates, false);
+    }
   }, [coordinates]);
   
   return (
@@ -69,11 +153,25 @@ const MapContainer = memo(function MapContainer({
         ref={mapRef}
         initialCenter={coordinates}
         centerPin
+        interactive={true}
         onCenterChanged={handleMapCenterChanged}
       />
     </div>
   );
-});  // Remove memo comparison function to ensure updates are always processed
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only re-render if the coordinates have changed significantly
+  const prevCoords = prevProps.coordinates;
+  const nextCoords = nextProps.coordinates;
+  
+  // Check if coordinates are close enough (within 0.000001 degrees)
+  const isClose = 
+    Math.abs(prevCoords[0] - nextCoords[0]) < 0.000001 && 
+    Math.abs(prevCoords[1] - nextCoords[1]) < 0.000001;
+  
+  // Re-render if coordinates are not close (return true if props are equal)
+  return isClose;
+});
 
 // No longer using memo comparison function as it was causing issues with position updates
 
@@ -106,6 +204,104 @@ export default function AddEntryPage() {
   const [submittedEntry, setSubmittedEntry] = useState<RoadCrackEntry | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   
+  // New state for dragging pin
+  const [isDraggingPin, setIsDraggingPin] = useState(false);
+  
+  // Create a ref to store the last drag timestamp
+  const lastDragTimestampRef = useRef(0);
+
+  // Function to handle map center changed (when user drags the map)
+  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
+    console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
+    
+    // Create a fresh copy of coordinates to ensure React state updates
+    const freshCoords: [number, number] = [coords[0], coords[1]];
+    
+    // Set dragging pin state to true to highlight coordinates
+    setIsDraggingPin(true);
+    
+    // Update coordinates state with fresh copy - use setState callback to ensure we're using the latest state
+    setCoordinates(prevCoords => {
+      // Only update if coordinates have actually changed
+      if (prevCoords[0] === freshCoords[0] && prevCoords[1] === freshCoords[1]) {
+        return prevCoords;
+      }
+      return freshCoords;
+    });
+    
+    // Get the coordinates for display
+    const [lng, lat] = freshCoords;
+    
+    // Immediately set a temporary location name for better responsiveness
+    const tempLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    setLocation(prevLocation => {
+      // Only update location if it's significantly different
+      if (prevLocation === tempLocation) {
+        return prevLocation;
+      }
+      return tempLocation;
+    });
+    
+    // Store the last drag timestamp to prevent race conditions
+    const dragTimestamp = Date.now();
+    lastDragTimestampRef.current = dragTimestamp;
+    
+    // Show loading state
+    setIsSearching(true);
+    
+    // Debounce the reverse geocoding (only for location name, not coordinates)
+    const debounceTimeout = setTimeout(() => {
+      // Only proceed if this is still the most recent drag event
+      if (dragTimestamp !== lastDragTimestampRef.current) {
+        return;
+      }
+      
+      // Reset dragging pin state after debounce
+      setIsDraggingPin(false);
+      
+      // Reverse geocode to get location name
+      const reverseGeocode = async () => {
+        try {
+          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('[AddEntryPage] Geocoding data:', data);
+            
+            if (data.features && data.features.length > 0) {
+              // Get the most relevant place name
+              const placeName = data.features[0].place_name;
+              setLocation(placeName);
+            } else {
+              // For locations with no features (like oceans), use coordinates with indicator
+              const waterLocation = `Water location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+              setLocation(waterLocation);
+            }
+          } else {
+            throw new Error('Failed to fetch location data');
+          }
+        } catch (error) {
+          console.error('[AddEntryPage] Error in reverse geocoding:', error);
+          // Fallback to showing coordinates
+          const fallbackLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          setLocation(fallbackLocation);
+        } finally {
+          // Hide loading state
+          setIsSearching(false);
+        }
+      };
+      
+      // Execute the reverse geocoding
+      reverseGeocode();
+    }, 300);
+    
+    // Return cleanup function to clear timeout if component unmounts
+    return () => clearTimeout(debounceTimeout);
+  }, []);
+
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -252,110 +448,7 @@ export default function AddEntryPage() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  };  
-  
-  // Create a ref to store the last drag timestamp (instead of attaching to function)
-  const lastDragTimestampRef = useRef(0);
-
-  // Function to handle map center changed (when user drags the map)
-  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
-    console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
-    
-    // Update coordinates state - ensure we update this immediately
-    console.log('[AddEntryPage] Previous coordinates:', coordinates);
-    setCoordinates(coords);
-    console.log('[AddEntryPage] Updated coordinates state');
-    
-    // Show loading state
-    console.log('[AddEntryPage] Setting loading states');
-    setIsSearching(true);
-    setShowSearchResults(false); // Hide search results when map is dragged
-    
-    // Provide visual feedback that the location is being processed
-    const [lng, lat] = coords;
-    
-    // Immediately set a temporary location name while we fetch the actual name
-    const tempLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    console.log('[AddEntryPage] Setting temporary location:', tempLocation);
-    setLocation(tempLocation);
-    
-    // Store the last drag timestamp to prevent race conditions
-    const dragTimestamp = Date.now();
-    const prevTimestamp = lastDragTimestampRef.current || 0;
-    console.log('[AddEntryPage] Updating drag timestamp from', prevTimestamp, 'to', dragTimestamp);
-    lastDragTimestampRef.current = dragTimestamp;
-    
-    // Debounce the reverse geocoding to avoid too many API calls while dragging
-    console.log('[AddEntryPage] Setting debounce timeout for reverse geocoding');
-    const debounceTimeout = setTimeout(() => {
-      console.log('[AddEntryPage] Debounce timeout fired, timestamp check:', 
-        dragTimestamp === lastDragTimestampRef.current ? 'MATCH' : 'OUTDATED');
-      
-      // Only proceed if this is still the most recent drag event
-      if (dragTimestamp !== lastDragTimestampRef.current) {
-        console.log('[AddEntryPage] Skipping outdated reverse geocode request');
-        return;
-      }
-      
-      // Reverse geocode to get location name
-      console.log('[AddEntryPage] Starting reverse geocoding for:', coords);
-      const reverseGeocode = async () => {
-        console.log('[AddEntryPage] Inside reverseGeocode function for:', [lng, lat]);
-        try {
-          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-          console.log('[AddEntryPage] Fetching from Mapbox Geocoding API');
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
-          );
-          
-          if (response.ok) {
-            console.log('[AddEntryPage] Geocoding API response received successfully');
-            const data = await response.json();
-            console.log('[AddEntryPage] Geocoding data:', data);
-            
-            if (data.features && data.features.length > 0) {
-              // Clear all event listeners
-              clearTimeout(debounceTimeout);
-              lastDragTimestampRef.current = 0;
-              console.log('[AddEntryPage] Clearing state');
-              // Get the most relevant place name
-              const placeName = data.features[0].place_name;
-              console.log('[AddEntryPage] Setting location to:', placeName);
-              setLocation(placeName);
-              
-              // Clear search query to show the selected location clearly
-              console.log('[AddEntryPage] Clearing search query');
-              setSearchQuery('');
-            } else {
-              // If no results, just show coordinates
-              const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-              console.log('[AddEntryPage] No features found, using fallback:', fallbackLocation);
-              setLocation(fallbackLocation);
-            }
-          } else {
-            console.error('[AddEntryPage] Geocoding API response not OK:', response.status);
-            throw new Error('Failed to fetch location data');
-          }
-        } catch (error) {
-          console.error('[AddEntryPage] Error in reverse geocoding:', error);
-          // Fallback to showing coordinates
-          const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          console.log('[AddEntryPage] Setting fallback location after error:', fallbackLocation);
-          setLocation(fallbackLocation);
-        } finally {
-          // Hide loading state
-          console.log('[AddEntryPage] Finished reverse geocoding, hiding loading state');
-          setIsSearching(false);
-        }
-      };
-      
-      // Execute the reverse geocoding
-      console.log('[AddEntryPage] Executing reverseGeocode function');
-      reverseGeocode();
-    }, 300); // Wait 300ms after dragging stops before geocoding
-  }, [coordinates, setCoordinates, setLocation, setSearchQuery, setShowSearchResults, setIsSearching]);
-
-  // lastDragTimestampRef is already used instead of static property
+  };
 
   // Navigate between steps
   const goToNextStep = () => {
@@ -560,10 +653,10 @@ export default function AddEntryPage() {
                 type="button"
                 onClick={goToNextStep}
                 disabled={!previewUrl}
-                className="flex items-center justify-center py-2 px-6 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center h-10 px-5 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-                <ChevronRight size={18} className="ml-1" />
+                <ChevronRight size={16} className="ml-1.5" />
               </button>
             </div>
           </div>
@@ -660,11 +753,10 @@ export default function AddEntryPage() {
                       <p className="text-sm font-medium text-foreground">
                         {location || 'No location selected'}
                       </p>
-                      {coordinates && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Coordinates: {coordinates[1].toFixed(5)}, {coordinates[0].toFixed(5)}
-                        </p>
-                      )}
+                      <div className={`text-xs font-mono ${isDraggingPin ? 'bg-primary/10 font-bold animate-pulse' : ''} text-muted-foreground mt-1 p-1 rounded transition-all duration-75`}>
+                        {/* Force re-render by using the actual coordinate values in the key */}
+                        {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -791,24 +883,24 @@ export default function AddEntryPage() {
               <button
                 type="button"
                 onClick={goToPreviousStep}
-                className="flex items-center justify-center py-2 px-6 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors"
+                className="flex items-center justify-center h-10 px-5 border border-border text-foreground font-medium rounded-md hover:bg-muted transition-colors"
               >
-                <ChevronLeft size={18} className="mr-1" />
+                <ChevronLeft size={16} className="mr-1.5" />
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center justify-center py-2 px-6 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
+                className="flex items-center justify-center h-10 px-5 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2"></div>
                     Processing...
                   </>
                 ) : isSuccess ? (
                   <>
-                    <Check size={18} className="mr-2" />
+                    <Check size={16} className="mr-1.5" />
                     Submitted!
                   </>
                 ) : (

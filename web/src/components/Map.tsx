@@ -25,7 +25,7 @@ interface MapProps {
 // Using forwardRef to expose the map instance and methods to parent components
 const Map = forwardRef<{
   mapInstance: MapboxMap | null;
-  setCenter: (coordinates: [number, number]) => void;
+  setCenter: (coordinates: [number, number], updateCamera?: boolean) => void;
   getCenter: () => [number, number];
   isInitialized: () => boolean;
   addMarkers: (markers: Array<{ coordinates: [number, number], element?: HTMLElement, popup?: { content: string, offset?: number } }>) => void;
@@ -57,9 +57,9 @@ const Map = forwardRef<{
   useImperativeHandle(ref, () => ({
     mapInstance,
     
-    setCenter: (coordinates: [number, number]) => {
-      console.log('[Map] Setting center to:', coordinates);
-      setCenter(coordinates);
+    setCenter: (coordinates: [number, number], updateCamera = true) => {
+      console.log('[Map] Setting center to:', coordinates, 'updateCamera:', updateCamera);
+      setCenter(coordinates, updateCamera);
     },
     
     getCenter: () => center,
@@ -88,8 +88,8 @@ const Map = forwardRef<{
           <div className="w-10 h-10 flex items-center justify-center">
             <div className="w-8 h-8 bg-contain bg-no-repeat" style={{ 
               backgroundImage: 'url(/map-pin.svg)',
-              filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.5))',
-              transform: 'translateY(-50%)' 
+              filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.5)) saturate(100%) invert(26%) sepia(95%) saturate(2163%) hue-rotate(342deg) brightness(91%) contrast(95%)',
+              transform: 'translateY(-50%)'
             }} />
           </div>
         </div>

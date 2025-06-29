@@ -541,7 +541,7 @@ export default function AddEntryPage() {
       formData.append('severity', severity);
       formData.append('image', selectedFile);
       // Add user_id - using a default value if not available
-      formData.append('user_id', '1'); // Use appropriate user ID from your auth system
+      formData.append('user_id', '00472f53-73a0-4912-a79b-68407e5998e3'); // Use the actual user ID from database
       
       // Simulate progress updates
       const progressInterval = setInterval(() => {

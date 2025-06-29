@@ -24,7 +24,7 @@ import { useEntry } from '@/lib/swr-hooks'
 import { EditFormData } from '@/components/modal/EditModal'
 import EditModal from '@/components/modal/EditModal'
 import DeleteConfirmationModal from '@/components/modal/DeleteConfirmationModal'
-import { ToastProvider, useToast } from '@/components/toast/ToastProvider'
+import { useToast } from '@/components/toast/ToastProvider'
 import ImageViewer from '@/components/ImageViewer'
 
 type CrackTypeInfo = { count: number; avg_confidence: number }
@@ -36,15 +36,6 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 export default function DetailsPage() {
-  // Wrap the component with ToastProvider
-  return (
-    <ToastProvider>
-      <DetailsContent />
-    </ToastProvider>
-  )
-}
-
-function DetailsContent() {
   const router = useRouter()
   const params = useParams()
   const { entry: originalEntry, isLoading: isLoadingEntry, updateEntryData, deleteEntryData } = useEntry(params.id as string)
@@ -85,8 +76,11 @@ function DetailsContent() {
   const handleDelete = useCallback(async () => {
     try {
       await deleteEntryData()
-      showToast('Entry deleted successfully', 'success')
-      router.push('/dashboard')
+      showToast('Entry deleted successfully', 'success', 3000)
+      // 3 second delay to show the toast before redirecting
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 3000)
     } catch (err) {
       console.error('Failed to delete entry:', err)
       setIsDeleteModalOpen(false)
@@ -353,7 +347,7 @@ function DetailsContent() {
               <div className="p-3 border-t border-input bg-gradient-to-b from-transparent to-muted/10">
                 <button
                   onClick={() => router.push('/map')}
-                  className="flex items-center justify-center py-1.5 px-3 w-full bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
+                  className="flex items-center justify-center py-1.5 px-3 w-full bg-dalan-yellow text-foreground font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
                 >
                   View on Map
                 </button>
@@ -377,139 +371,186 @@ function DetailsContent() {
           <div className="p-4">
             {detectionInfo ? (
               <div className="space-y-6">
-                {/* Summary Overview - Improved cards with better visual hierarchy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {/* Total Cracks */}
-                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center mb-2">
-                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
-                        <Hash size={18} className="text-dalan-yellow" />
-                      </div>
-                      <p className="text-sm font-medium text-foreground/70">Total Cracks</p>
-                    </div>
-                    <p className="text-2xl font-bold text-foreground ml-1">
-                      {detectionInfo.total_cracks}
-                      <span className="text-xs font-normal text-foreground/50 ml-1">detected</span>
-                    </p>
-                  </div>
-                  
-                  {/* Primary Type */}
-                  <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center mb-2">
-                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
-                        <Tag size={18} className="text-dalan-yellow" />
-                      </div>
-                      <p className="text-sm font-medium text-foreground/70">Primary Type</p>
-                    </div>
-                    <p className="text-xl font-bold text-foreground ml-1 truncate">{entry.type}</p>
-                  </div>
-                  
-                    {/* Severity */}
-                    <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex items-center mb-2">
-                        <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
-                          <Shield size={18} className="text-dalan-yellow" />
+                {detectionInfo.total_cracks === 0 ? (
+                  // No cracks detected state
+                  <div className="text-center py-8">
+                    <div className="bg-card p-6 rounded-xl border border-input mb-6 max-w-2xl mx-auto">
+                      <div className="flex items-center justify-center mb-4">
+                        <div className="bg-muted p-4 rounded-full">
+                          <CheckCircle className="text-muted-foreground" size={32} />
                         </div>
-                        <p className="text-sm font-medium text-foreground/70">Severity</p>
                       </div>
-                      <div className="flex items-center ml-1">
-                        <p className="text-xl font-bold text-foreground">
-                          {entry.severity === 'minor' ? 'Minor' : 'Major'}
+                      <h3 className="text-xl font-bold text-foreground mb-3">No Road Cracks Detected</h3>
+                      <p className="text-muted-foreground mb-4 leading-relaxed">
+                        Our AI analysis completed successfully but didn't identify any road cracks in this image.
+                      </p>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="bg-background p-4 rounded-lg text-left border border-input">
+                          <h4 className="font-semibold text-foreground mb-2 text-sm">Possible Reasons:</h4>
+                          <ul className="text-xs text-muted-foreground space-y-1">
+                            <li>• Road surface is in good condition</li>
+                            <li>• Image doesn't show road infrastructure</li>
+                            <li>• Cracks too small or unclear to detect</li>
+                            <li>• Lighting or image quality affects detection</li>
+                          </ul>
+                        </div>
+                        
+                        <div className="bg-background p-4 rounded-lg text-left border border-input">
+                          <h4 className="font-semibold text-foreground mb-2 text-sm">💡 For Better Results:</h4>
+                          <ul className="text-xs text-muted-foreground space-y-1">
+                            <li>• Take photos directly above cracks</li>
+                            <li>• Ensure good lighting conditions</li>
+                            <li>• Focus on visible road damage</li>
+                            <li>• Avoid shadows or glare</li>
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-muted/50 p-4 rounded-lg border border-input">
+                        <p className="text-sm text-foreground font-medium mb-2">Entry Status</p>
+                        <p className="text-xs text-muted-foreground">
+                          This entry has been saved to your dashboard. You can edit it anytime to update information or resubmit with a different image.
                         </p>
-                        <span className={`text-xs ml-2 px-2 py-0.5 rounded-full ${entry.severity === 'minor' ? 'bg-dalan-yellow/10 text-dalan-yellow' : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
-                          {entry.severity === 'minor' ? 'Low Risk' : 'High Risk'}
-                        </span>
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Normal detection state - existing code
+                  <>
+                    {/* Summary Overview - Improved cards with better visual hierarchy */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {/* Total Cracks */}
+                      <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center mb-2">
+                          <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                            <Hash size={18} className="text-dalan-yellow" />
+                          </div>
+                          <p className="text-sm font-medium text-foreground/70">Total Cracks</p>
+                        </div>
+                        <p className="text-2xl font-bold text-foreground ml-1">
+                          {detectionInfo.total_cracks}
+                          <span className="text-xs font-normal text-foreground/50 ml-1">detected</span>
+                        </p>
+                      </div>
+                      
+                      {/* Primary Type */}
+                      <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center mb-2">
+                          <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                            <Tag size={18} className="text-dalan-yellow" />
+                          </div>
+                          <p className="text-sm font-medium text-foreground/70">Primary Type</p>
+                        </div>
+                        <p className="text-xl font-bold text-foreground ml-1 truncate">{entry.type}</p>
+                      </div>
+                      
+                        {/* Severity */}
+                        <div className="bg-gradient-to-br from-card to-card/80 rounded-xl p-4 border border-input shadow-sm hover:shadow-md transition-shadow">
+                          <div className="flex items-center mb-2">
+                            <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                              <Shield size={18} className="text-dalan-yellow" />
+                            </div>
+                            <p className="text-sm font-medium text-foreground/70">Severity</p>
+                          </div>
+                          <div className="flex items-center ml-1">
+                            <p className="text-xl font-bold text-foreground">
+                              {entry.severity === 'minor' ? 'Minor' : 'Major'}
+                            </p>
+                            <span className={`text-xs ml-2 px-2 py-0.5 rounded-full ${entry.severity === 'minor' ? 'bg-dalan-yellow/10 text-dalan-yellow' : 'bg-red-500/10 text-red-500 dark:text-red-400'}`}>
+                              {entry.severity === 'minor' ? 'Low Risk' : 'High Risk'}
+                            </span>
+                          </div>
+                        </div>
                     </div>
                     
-      
-                </div>
-                
-                {/* Crack Types - Redesigned Layout */}
-                <div className="mt-8">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center">
-                      <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
-                        <Layers size={18} className="text-dalan-yellow" />
-                      </div>
-                      <h3 className="font-medium text-foreground text-lg">Detected Crack Types</h3>
-                    </div>
-                   
-                  </div>
-                  
-                  <div className="flex flex-col gap-5 overflow-y-auto">
-                    {Object.entries(detectionInfo.crack_types).map(([type, info]) => {
-                      // Type assertion to handle TypeScript unknown type
-                      const crackInfo = info as CrackTypeInfo;
-                      const confidenceLevel = crackInfo.avg_confidence;
-                      
-                      // Determine confidence level styling
-                      let confidenceColor, confidenceTextColor, confidenceBg, confidenceIcon;
-                      
-                      if (confidenceLevel >= 80) {
-                        confidenceColor = 'bg-green-500 dark:bg-green-600';
-                        confidenceTextColor = 'text-green-600 dark:text-green-400';
-                        confidenceBg = 'bg-green-50 dark:bg-green-900/20';
-                        confidenceIcon = <CheckCircle size={16} className={confidenceTextColor} />;
-                      } else if (confidenceLevel >= 60) {
-                        confidenceColor = 'bg-amber-500 dark:bg-amber-600';
-                        confidenceTextColor = 'text-amber-600 dark:text-amber-400';
-                        confidenceBg = 'bg-amber-50 dark:bg-amber-900/20';
-                        confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                      } else {
-                        confidenceColor = 'bg-red-500 dark:bg-red-600';
-                        confidenceTextColor = 'text-red-600 dark:text-red-400';
-                        confidenceBg = 'bg-red-50 dark:bg-red-900/20';
-                        confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
-                      }
-                      
-                      // Use type for the key in the div below
-                      
-                      return (
-                        <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30 w-full">
-                          {/* Header with gradient background based on confidence */}
-                          <div className={`p-4 border-b border-input bg-gradient-to-r ${confidenceLevel >= 80 ? 'from-green-50/50 to-transparent dark:from-green-900/10' : confidenceLevel >= 60 ? 'from-amber-50/50 to-transparent dark:from-amber-900/10' : 'from-red-50/50 to-transparent dark:from-red-900/10'}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
-                                  <FileText size={16} className="text-dalan-yellow" />
-                                </div>
-                                <span className="font-medium text-foreground">{type}</span>
-                              </div>
-                              <span className="text-sm px-2.5 py-1 rounded-full bg-dalan-yellow/10 text-dalan-yellow font-medium">
-                                {crackInfo.count}
-                              </span>
-                            </div>
+                    {/* Crack Types - Redesigned Layout */}
+                    <div className="mt-8">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center">
+                          <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                            <Layers size={18} className="text-dalan-yellow" />
                           </div>
+                          <h3 className="font-medium text-foreground text-lg">Detected Crack Types</h3>
+                        </div>
+                       
+                      </div>
+                      
+                      <div className="flex flex-col gap-5 overflow-y-auto">
+                        {Object.entries(detectionInfo.crack_types).map(([type, info]) => {
+                          // Type assertion to handle TypeScript unknown type
+                          const crackInfo = info as CrackTypeInfo;
+                          const confidenceLevel = crackInfo.avg_confidence;
                           
-                          <div className="p-4">
-                            {/* Confidence indicator */}
-                            <div className="mb-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center">
-                                  <div className={`p-1.5 rounded-md mr-2 ${confidenceBg}`}>
-                                    {confidenceIcon}
+                          // Determine confidence level styling
+                          let confidenceColor, confidenceTextColor, confidenceBg, confidenceIcon;
+                          
+                          if (confidenceLevel >= 80) {
+                            confidenceColor = 'bg-green-500 dark:bg-green-600';
+                            confidenceTextColor = 'text-green-600 dark:text-green-400';
+                            confidenceBg = 'bg-green-50 dark:bg-green-900/20';
+                            confidenceIcon = <CheckCircle size={16} className={confidenceTextColor} />;
+                          } else if (confidenceLevel >= 60) {
+                            confidenceColor = 'bg-amber-500 dark:bg-amber-600';
+                            confidenceTextColor = 'text-amber-600 dark:text-amber-400';
+                            confidenceBg = 'bg-amber-50 dark:bg-amber-900/20';
+                            confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
+                          } else {
+                            confidenceColor = 'bg-red-500 dark:bg-red-600';
+                            confidenceTextColor = 'text-red-600 dark:text-red-400';
+                            confidenceBg = 'bg-red-50 dark:bg-red-900/20';
+                            confidenceIcon = <AlertCircle size={16} className={confidenceTextColor} />;
+                          }
+                          
+                          // Use type for the key in the div below
+                          
+                          return (
+                            <div key={type} className="bg-gradient-to-br from-card to-card/90 rounded-xl border border-input overflow-hidden hover:shadow-md transition-all duration-300 hover:border-dalan-yellow/30 w-full">
+                              {/* Header with gradient background based on confidence */}
+                              <div className={`p-4 border-b border-input bg-gradient-to-r ${confidenceLevel >= 80 ? 'from-green-50/50 to-transparent dark:from-green-900/10' : confidenceLevel >= 60 ? 'from-amber-50/50 to-transparent dark:from-amber-900/10' : 'from-red-50/50 to-transparent dark:from-red-900/10'}`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <div className="bg-dalan-yellow/15 p-2 rounded-lg mr-3">
+                                      <FileText size={16} className="text-dalan-yellow" />
+                                    </div>
+                                    <span className="font-medium text-foreground">{type}</span>
                                   </div>
-                                  <span className="text-sm font-medium">AI Confidence</span>
+                                  <span className="text-sm px-2.5 py-1 rounded-full bg-dalan-yellow/10 text-dalan-yellow font-medium">
+                                    {crackInfo.count}
+                                  </span>
                                 </div>
-                                <span className={`text-sm font-bold ${confidenceTextColor}`}>{confidenceLevel}%</span>
                               </div>
                               
-                              <div className="h-2.5 bg-muted/50 rounded-full overflow-hidden">
-                                <div 
-                                  className={`${confidenceColor} h-full rounded-full transition-all duration-500 ease-out`}
-                                  style={{ width: `${confidenceLevel}%` }}
-                                ></div>
+                              <div className="p-4">
+                                {/* Confidence indicator */}
+                                <div className="mb-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <div className={`p-1.5 rounded-md mr-2 ${confidenceBg}`}>
+                                        {confidenceIcon}
+                                      </div>
+                                      <span className="text-sm font-medium">AI Confidence</span>
+                                    </div>
+                                    <span className={`text-sm font-bold ${confidenceTextColor}`}>{confidenceLevel}%</span>
+                                  </div>
+                                  
+                                  <div className="h-2.5 bg-muted/50 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`${confidenceColor} h-full rounded-full transition-all duration-500 ease-out`}
+                                      style={{ width: `${confidenceLevel}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                                
+                               
                               </div>
                             </div>
-                            
-                           
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="text-foreground/70">

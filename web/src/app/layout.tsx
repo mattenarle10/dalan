@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 import dynamic from "next/dynamic";
+import { ToastProvider } from "@/components/toast/ToastProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
-
+        <ToastProvider>
           <Navbar />
           <main className="flex-grow">
             {children}
@@ -41,7 +42,7 @@ export default function RootLayout({
           <div className="hidden sm:block">
             <Footer />
           </div>
-
+        </ToastProvider>
       </body>
     </html>
   );

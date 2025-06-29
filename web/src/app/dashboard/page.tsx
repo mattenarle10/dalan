@@ -136,6 +136,7 @@ export default function Dashboard() {
               <option value="alligator">Alligator</option>
               <option value="longitudinal">Longitudinal</option>
               <option value="transverse">Transverse</option>
+              <option value="pothole">Pothole</option>
             </select>
           </div>
           
@@ -162,7 +163,7 @@ export default function Dashboard() {
             
             <button 
               onClick={() => setIsFilterModalOpen(false)}
-              className="px-4 py-2 rounded-md bg-dalan-yellow text-black text-sm font-medium hover:opacity-90 transition-opacity"
+              className="px-4 py-2 rounded-md bg-dalan-yellow text-foreground text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Apply Filters
             </button>
@@ -174,27 +175,33 @@ export default function Dashboard() {
       <div className="flex flex-wrap gap-2 mb-6">
         <button 
           onClick={() => setTypeFilter('all')} 
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'all' ? 'bg-dalan-yellow text-black' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'all' ? 'bg-dalan-yellow text-foreground' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
         >
           All Types
         </button>
         <button 
           onClick={() => setTypeFilter('alligator')} 
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'alligator' ? 'bg-dalan-yellow text-black' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'alligator' ? 'bg-dalan-yellow text-foreground' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
         >
           Alligator
         </button>
         <button 
           onClick={() => setTypeFilter('longitudinal')} 
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'longitudinal' ? 'bg-dalan-yellow text-black' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'longitudinal' ? 'bg-dalan-yellow text-foreground' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
         >
           Longitudinal
         </button>
         <button 
           onClick={() => setTypeFilter('transverse')} 
-          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'transverse' ? 'bg-dalan-yellow text-black' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'transverse' ? 'bg-dalan-yellow text-foreground' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
         >
           Transverse
+        </button>
+        <button 
+          onClick={() => setTypeFilter('pothole')} 
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${typeFilter === 'pothole' ? 'bg-dalan-yellow text-foreground' : 'bg-card border border-gray-200 dark:border-gray-800 hover:bg-card/80'}`}
+        >
+          Pothole
         </button>
       </div>
       

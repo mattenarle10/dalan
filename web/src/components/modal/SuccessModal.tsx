@@ -87,25 +87,25 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="!bg-background text-foreground rounded-lg shadow-xl max-w-md w-full border border-border relative overflow-hidden" style={{ backgroundColor: 'var(--background)' }}>
+      <div className="!bg-background text-foreground rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-border relative" style={{ backgroundColor: 'var(--background)' }}>
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 via-green-500 to-green-400"></div>
-        <div className="p-6"> 
-          <div className="flex items-start justify-between mb-6">
+        <div className="p-4 md:p-6"> 
+          <div className="flex items-start justify-between mb-4 md:mb-6">
             <div className="flex items-center">
               <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full mr-3">
-                <CheckCircle className="text-green-500" size={24} />
+                <CheckCircle className="text-green-500" size={20} />
               </div>
-              <h2 className="text-xl font-bold">Submission Successful!</h2>
+              <h2 className="text-lg md:text-xl font-bold">Submission Successful!</h2>
             </div>
             <button 
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-100 dark:bg-gray-800 rounded-full p-1 transition-colors"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {/* Entry images - original and classified */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
@@ -115,7 +115,7 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
                   alt={entry.title} 
                   width={300}
                   height={150}
-                  className="w-full h-36 object-cover"
+                  className="w-full h-28 md:h-36 object-cover"
                 />
               </div>
               
@@ -127,7 +127,7 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
                     alt={`${entry.title} - Classified`} 
                     width={300}
                     height={150}
-                    className="w-full h-36 object-cover"
+                    className="w-full h-28 md:h-36 object-cover"
                   />
                 </div>
               )}
@@ -135,7 +135,7 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
             
             {/* Entry details */}
             <div>
-              <h3 className="font-bold text-lg">{entry.title}</h3>
+              <h3 className="font-bold text-base md:text-lg">{entry.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 text-sm mb-2">{entry.description}</p>
               <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <MapPin size={14} className="mr-1" />
@@ -143,42 +143,79 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
               </div>
             </div>
             
-            {/* AI Analysis Results - Simplified for mobile */}
+            {/* AI Analysis Results - Handle zero cracks case */}
             <div className="bg-dalan-pastel-yellow/30 p-4 rounded-lg border border-dalan-yellow">
               <h4 className="font-bold mb-2">Detection Summary</h4>
               
               {detectionInfo ? (
                 <>
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium">Total Cracks:</span>
-                    <span className="font-bold">{detectionInfo.total_cracks}</span>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <p className="text-sm font-medium mb-2">Primary Type: <span className="font-bold">{entry.type}</span></p>
-                  </div>
-                  
-                  <div className="mt-3">
-                    <p className="text-sm font-medium mb-2">Detected Types:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(detectionInfo.crack_types).map(([type, info]) => (
-                        <div key={type} className="bg-white/50 dark:bg-gray-800/50 p-2 rounded flex-1 min-w-[120px]">
-                          <p className="font-medium text-sm">{type}</p>
-                          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            <span>{info.count}</span>
-                            <span>{info.avg_confidence}%</span>
-                          </div>
-                          {/* Simple confidence bar */}
-                          <div className="w-full bg-gray-200 dark:bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-dalan-yellow h-full rounded-full" 
-                              style={{ width: `${info.avg_confidence}%` }}
-                            ></div>
+                  {detectionInfo.total_cracks === 0 ? (
+                    // No cracks detected state - Mobile optimized
+                    <div className="text-center py-2">
+                      <div className="bg-card p-3 rounded-lg border border-input mb-3">
+                        <div className="flex items-center justify-center mb-2">
+                          <div className="bg-muted p-2 rounded-full">
+                            <CheckCircle className="text-muted-foreground" size={20} />
                           </div>
                         </div>
-                      ))}
+                        <h5 className="font-bold text-foreground mb-2 text-sm">No Road Cracks Detected</h5>
+                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                          Our AI didn't find any road cracks in this image.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 gap-2 mb-3">
+                          <div className="bg-background p-2 rounded text-left border border-input">
+                            <p className="text-xs text-foreground font-medium mb-1">💡 Quick Tips:</p>
+                            <ul className="text-xs text-muted-foreground space-y-0.5">
+                              <li>• Take photos directly above cracks</li>
+                              <li>• Ensure good lighting and focus</li>
+                              <li>• Image might show good road condition</li>
+                            </ul>
+                          </div>
+                        </div>
+                        
+                        <div className="bg-muted/50 p-2 rounded border border-input">
+                          <p className="text-xs text-foreground font-medium">
+                            Entry saved! You can edit it anytime from your dashboard.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    // Normal cracks detected state
+                    <>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-medium">Total Cracks:</span>
+                        <span className="font-bold">{detectionInfo.total_cracks}</span>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <p className="text-sm font-medium mb-2">Primary Type: <span className="font-bold">{entry.type}</span></p>
+                      </div>
+                      
+                      <div className="mt-3">
+                        <p className="text-sm font-medium mb-2">Detected Types:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(detectionInfo.crack_types).map(([type, info]) => (
+                            <div key={type} className="bg-white/50 dark:bg-gray-800/50 p-2 rounded flex-1 min-w-[120px]">
+                              <p className="font-medium text-sm">{type}</p>
+                              <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                <span>{info.count}</span>
+                                <span>{info.avg_confidence}%</span>
+                              </div>
+                              {/* Simple confidence bar */}
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 h-1 mt-1 rounded-full overflow-hidden">
+                                <div 
+                                  className="bg-dalan-yellow h-full rounded-full" 
+                                  style={{ width: `${info.avg_confidence}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -188,18 +225,18 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
             </div>
             
             {/* Action buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row gap-2 md:gap-3 mt-3 md:mt-4">
               <button
                 onClick={() => router.push('/map')}
-                className="flex-1 flex items-center justify-center py-2 px-4 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity"
+                className="flex-1 flex items-center justify-center py-2 px-3 md:px-4 bg-dalan-yellow text-foreground font-medium rounded-md hover:opacity-90 transition-opacity text-sm"
               >
                 View on Map
               </button>
               <button
                 onClick={() => router.push(`/details/${entry.id}`)}
-                className="flex-1 flex items-center justify-center py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors"
+                className="flex-1 flex items-center justify-center py-2 px-3 md:px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors text-sm"
               >
-                View More Details <ArrowRight size={16} className="ml-1" />
+                View More Details <ArrowRight size={14} className="ml-1" />
               </button>
             </div>
           </div>

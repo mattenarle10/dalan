@@ -286,13 +286,15 @@ async def create_entry(
         crack_types = detection_summary["crack_types"]
         
         # Determine the primary crack type based on highest confidence
-        primary_crack_type = "unknown"
+        primary_crack_type = "No cracks detected"  # Default for zero detections
         highest_confidence = 0
         
-        for crack_type, info in crack_types.items():
-            if info["avg_confidence"] > highest_confidence:
-                highest_confidence = info["avg_confidence"]
-                primary_crack_type = crack_type
+        # Only update if we have detections
+        if len(crack_types) > 0:
+            for crack_type, info in crack_types.items():
+                if info["avg_confidence"] > highest_confidence:
+                    highest_confidence = info["avg_confidence"]
+                    primary_crack_type = crack_type
         
         # Parse coordinates from JSON string
         coords = json.loads(coordinates)

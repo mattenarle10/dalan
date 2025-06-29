@@ -128,7 +128,7 @@ class MapManager {
   /**
    * Utility to debounce map updates (for drag events)
    */
-  static debounce<T extends (...args: any[]) => any>(
+  static debounce<T extends (...args: unknown[]) => unknown>(
     func: T,
     wait: number
   ): (...args: Parameters<T>) => void {

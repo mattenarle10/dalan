@@ -160,7 +160,7 @@ export default function SuccessModal({ isOpen, onClose, entry, isLoading = false
                         </div>
                         <h5 className="font-bold text-foreground mb-2 text-sm">No Road Cracks Detected</h5>
                         <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                          Our AI didn't find any road cracks in this image.
+                          Our AI didn&apos;t find any road cracks in this image.
                         </p>
                         
                         <div className="grid grid-cols-1 gap-2 mb-3">

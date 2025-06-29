@@ -11,6 +11,15 @@ export interface LocationSearchResult {
 }
 
 /**
+ * Interface for Mapbox API response feature
+ */
+interface MapboxFeature {
+  id: string;
+  place_name: string;
+  center: [number, number];
+}
+
+/**
  * Custom hook for searching locations and reverse geocoding using Mapbox
  */
 export function useLocationSearch() {
@@ -57,7 +66,7 @@ export function useLocationSearch() {
         const data = await response.json();
         
         // Format search results
-        const formattedResults: LocationSearchResult[] = data.features.map((feature: any) => ({
+        const formattedResults: LocationSearchResult[] = data.features.map((feature: MapboxFeature) => ({
           id: feature.id,
           place_name: feature.place_name,
           center: feature.center as [number, number]
@@ -79,7 +88,9 @@ export function useLocationSearch() {
    * Debounced version of the search function to prevent too many API calls
    */
   const debouncedSearchLocation = useCallback(
-    debounce((query: string) => searchLocation(query), 300),
+    (query: string) => {
+      debounce(searchLocation, 300)(query);
+    },
     [searchLocation]
   );
   
@@ -131,9 +142,11 @@ export function useLocationSearch() {
    * Debounced version of reverse geocoding to prevent too many API calls
    */
   const debouncedReverseGeocode = useCallback(
-    debounce((coords: [number, number], callback: (location: string) => void) => {
-      reverseGeocode(coords).then(callback);
-    }, 500),
+    (coords: [number, number], callback: (location: string) => void) => {
+      debounce((coords: [number, number], callback: (location: string) => void) => {
+        reverseGeocode(coords).then(callback);
+      }, 500)(coords, callback);
+    },
     [reverseGeocode]
   );
   

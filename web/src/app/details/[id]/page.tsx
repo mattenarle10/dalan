@@ -340,7 +340,6 @@ export default function DetailsPage() {
                   <Map 
                     initialCenter={entry.coordinates}
                     zoom={16}
-                    markers={[{ position: entry.coordinates, popup: entry.title }]}
                   />
                 </div>
               </div>
@@ -382,7 +381,7 @@ export default function DetailsPage() {
                       </div>
                       <h3 className="text-xl font-bold text-foreground mb-3">No Road Cracks Detected</h3>
                       <p className="text-muted-foreground mb-4 leading-relaxed">
-                        Our AI analysis completed successfully but didn't identify any road cracks in this image.
+                        Our AI analysis completed successfully but didn&apos;t identify any road cracks in this image.
                       </p>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -390,7 +389,7 @@ export default function DetailsPage() {
                           <h4 className="font-semibold text-foreground mb-2 text-sm">Possible Reasons:</h4>
                           <ul className="text-xs text-muted-foreground space-y-1">
                             <li>• Road surface is in good condition</li>
-                            <li>• Image doesn't show road infrastructure</li>
+                            <li>• Image doesn&apos;t show road infrastructure</li>
                             <li>• Cracks too small or unclear to detect</li>
                             <li>• Lighting or image quality affects detection</li>
                           </ul>

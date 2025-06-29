@@ -164,7 +164,7 @@ const MapContainer = memo(forwardRef<
       interactive={true}
       onCenterChanged={handleMapCenterChanged}
     />
-  ), []); // Empty dependency array means this only runs once
+  ), [handleMapCenterChanged]);
   
   return (
     <div className="w-full h-full relative">

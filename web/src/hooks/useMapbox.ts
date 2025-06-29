@@ -1,10 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { Map as MapboxMap, MapboxOptions } from 'mapbox-gl';
+import MapManager from '@/lib/mapManager';
 
 interface UseMapboxOptions {
   initialCenter: [number, number];
   zoom?: number;
   style?: string;
+  interactive?: boolean;
   markers?: Array<{
     coordinates: [number, number];
     element?: HTMLElement;
@@ -23,6 +25,7 @@ export function useMapbox({
   initialCenter,
   zoom = 13,
   style = 'mapbox://styles/mapbox/streets-v11',
+  interactive = true,
   markers,
   onCenterChanged
 }: UseMapboxOptions) {
@@ -32,11 +35,12 @@ export function useMapbox({
   const [center, setCenter] = useState<[number, number]>(initialCenter);
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const eventHandlersSetup = useRef<boolean>(false);
+  const mapIdRef = useRef<string>('');
 
-  // Initialize map
+  // Initialize map using MapManager
   useEffect(() => {
     if (!mapContainerRef.current) return;
-    if (mapInstanceRef.current) return;
+    if (mapInstanceRef.current) return; // Already initialized
     
     let isMounted = true;
     
@@ -44,38 +48,30 @@ export function useMapbox({
       if (typeof window === 'undefined') return;
       
       try {
-        // Import mapbox-gl dynamically to avoid SSR issues
-        const mapboxgl = (await import('mapbox-gl')).default;
-        console.log('[useMapbox] Initializing map');
+        // Generate unique map ID based on container and current time
+        const mapId = `map_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        mapIdRef.current = mapId;
         
-        // Configure Mapbox
-        mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+        console.log('[useMapbox] Initializing map with MapManager:', mapId);
         
-        // Create map instance
-        const map = new mapboxgl.Map({
+        const mapManager = MapManager.getInstance();
+        const map = await mapManager.getMap(mapId, {
           container: mapContainerRef.current!,
-          style: style,
           center: initialCenter,
           zoom: zoom,
-          attributionControl: true
+          style: style,
+          interactive: interactive
         });
         
-        // Handle map load event
-        map.on('load', () => {
-          if (isMounted) {
-            console.log('[useMapbox] Map loaded successfully');
-            mapInstanceRef.current = map;
-            setIsLoaded(true);
-          }
-        });
-        
-        // Add error handler
-        map.on('error', (e) => {
-          console.error('[useMapbox] Mapbox error:', e.error);
-        });
-        
-        // Add navigation controls
-        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        if (isMounted) {
+          console.log('[useMapbox] Map loaded successfully via MapManager');
+          mapInstanceRef.current = map;
+          setIsLoaded(true);
+          
+          // Add navigation controls
+          const mapboxgl = (await import('mapbox-gl')).default;
+          map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        }
         
       } catch (error) {
         console.error('[useMapbox] Error initializing map:', error);
@@ -87,19 +83,26 @@ export function useMapbox({
     // Cleanup function
     return () => {
       isMounted = false;
-      if (mapInstanceRef.current) {
-        console.log('[useMapbox] Removing map instance');
-        mapInstanceRef.current.remove();
+      if (mapIdRef.current && mapInstanceRef.current) {
+        console.log('[useMapbox] Cleaning up map instance:', mapIdRef.current);
+        const mapManager = MapManager.getInstance();
+        mapManager.removeMap(mapIdRef.current);
         mapInstanceRef.current = null;
         eventHandlersSetup.current = false;
       }
     };
-  }, [initialCenter, zoom, style]);
+  }, []); // Remove dependencies to prevent re-initialization
 
   // Setup event handlers after map is initialized
   useEffect(() => {
     if (!isLoaded || !mapInstanceRef.current) return;
     if (eventHandlersSetup.current) return;
+    
+    // Skip setting up event handlers if map is not interactive
+    if (!interactive) {
+      console.log('[useMapbox] Map is not interactive, skipping event handlers');
+      return;
+    }
     
     const map = mapInstanceRef.current;
     console.log('[useMapbox] Setting up map event handlers');
@@ -108,6 +111,7 @@ export function useMapbox({
     // Trigger initial center changed callback
     if (onCenterChanged) {
       setTimeout(() => {
+        if (!map || !mapInstanceRef.current) return;
         const mapCenter = map.getCenter();
         onCenterChanged([mapCenter.lng, mapCenter.lat]);
       }, 100);
@@ -125,8 +129,21 @@ export function useMapbox({
     map.on('drag', () => {
       // Update coordinates in real-time during dragging
       if (onCenterChanged) {
-        const mapCenter = map.getCenter();
-        onCenterChanged([mapCenter.lng, mapCenter.lat]);
+        try {
+          const mapCenter = map.getCenter();
+          const newCenter: [number, number] = [mapCenter.lng, mapCenter.lat];
+          console.log('[useMapbox:drag] New center:', newCenter);
+          
+          // Always update local state and notify parent, even over water
+          setCenter([...newCenter]); // Update local state with fresh array
+          
+          // Use requestAnimationFrame to ensure smooth UI updates
+          requestAnimationFrame(() => {
+            onCenterChanged([...newCenter]); // Notify parent with fresh array
+          });
+        } catch (e) {
+          console.error('[useMapbox] Error during drag event:', e);
+        }
       }
     });
     
@@ -136,18 +153,26 @@ export function useMapbox({
       
       // Always update coordinates when dragging ends
       if (onCenterChanged) {
-        const mapCenter = map.getCenter();
-        onCenterChanged([mapCenter.lng, mapCenter.lat]);
+        try {
+          const mapCenter = map.getCenter();
+          const newCenter: [number, number] = [mapCenter.lng, mapCenter.lat];
+          console.log('[useMapbox:dragend] Final center:', newCenter);
+          
+          // Update local state with fresh array
+          setCenter([...newCenter]);
+          
+          // Ensure UI updates with the final position
+          requestAnimationFrame(() => {
+            onCenterChanged([...newCenter]); // Notify parent with fresh array
+          });
+        } catch (e) {
+          console.error('[useMapbox] Error during dragend event:', e);
+        }
       }
     });
     
     // Handle zoom events
-    map.on('zoomstart', () => {
-      console.log('[useMapbox] Zoom started');
-    });
-    
     map.on('zoomend', () => {
-      console.log('[useMapbox] Zoom ended');
       setCurrentZoom(map.getZoom());
       
       // Update coordinates when zoom ends and not dragging
@@ -157,27 +182,48 @@ export function useMapbox({
       }
     });
     
-    // Handle move events
-    map.on('moveend', () => {
-      // Update coordinates when movement ends and not dragging
-      if (!isDragging && onCenterChanged) {
-        const mapCenter = map.getCenter();
-        onCenterChanged([mapCenter.lng, mapCenter.lat]);
-      }
-    });
-    
+    // Return cleanup function - but don't remove the map instance
     return () => {
-      // Cleanup is handled by the main useEffect cleanup
+      console.log('[useMapbox] Cleaning up event handlers');
+      eventHandlersSetup.current = false;
     };
-  }, [isLoaded, onCenterChanged]);
+  }, [isLoaded, onCenterChanged, interactive]);
   
   // Function to programmatically set map center
-  const setMapCenter = useCallback((newCenter: [number, number]) => {
+  const setMapCenter = useCallback((newCenter: [number, number], updateCamera = true) => {
     if (!mapInstanceRef.current || !isLoaded) return;
-    console.log('[useMapbox] Setting map center to:', newCenter);
-    mapInstanceRef.current.setCenter(newCenter);
-    setCenter(newCenter);
-  }, [isLoaded]);
+    console.log('[useMapbox] Setting center to:', newCenter, 'updateCamera:', updateCamera);
+    
+    // Ensure we're working with valid coordinates
+    if (!Array.isArray(newCenter) || newCenter.length !== 2 || 
+        isNaN(newCenter[0]) || isNaN(newCenter[1])) {
+      console.error('[useMapbox] Invalid coordinates:', newCenter);
+      return;
+    }
+    
+    try {
+      // Create a fresh copy of coordinates to ensure state updates
+      const freshCenter: [number, number] = [newCenter[0], newCenter[1]];
+      
+      // Update local state with fresh array
+      setCenter(freshCenter);
+      
+      // Optionally update the camera position
+      if (updateCamera) {
+        mapInstanceRef.current.setCenter(freshCenter);
+      }
+      
+      // Also trigger the onCenterChanged callback if provided
+      if (onCenterChanged) {
+        // Use requestAnimationFrame to ensure smooth UI updates
+        requestAnimationFrame(() => {
+          onCenterChanged(freshCenter);
+        });
+      }
+    } catch (error) {
+      console.error('[useMapbox] Error setting center:', error);
+    }
+  }, [isLoaded, onCenterChanged]);
   
   // Function to add markers to the map
   const addMarkers = useCallback(async (markers: UseMapboxOptions['markers']) => {
@@ -228,6 +274,12 @@ export function useMapbox({
     center,
     zoom: currentZoom,
     setCenter: setMapCenter,
-    addMarkers
+    addMarkers,
+    // Method to get the current center from the map directly
+    getCurrentMapCenter: useCallback(() => {
+      if (!mapInstanceRef.current) return initialCenter;
+      const mapCenter = mapInstanceRef.current.getCenter();
+      return [mapCenter.lng, mapCenter.lat] as [number, number];
+    }, [initialCenter])
   };
 }

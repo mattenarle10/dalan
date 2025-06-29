@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, useCallback, memo, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X, Loader, Navigation } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
@@ -11,69 +11,175 @@ import { RoadCrackEntry } from '@/lib/interface'
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(() => import('@/components/Map'), { 
   ssr: false, 
-  loading: () => <div className="w-full h-60 bg-gray-100 animate-pulse rounded-lg"></div> 
+  loading: () => <div className="w-full h-60 bg-gray-100 animate-pulse rounded-lg"></div>
 })
 
 // Create a stable MapContainer component that won't remount when coordinates change
-const MapContainer = memo(function MapContainer({ 
+const MapContainer = memo(forwardRef<
+  {
+    centerMap: (coords: [number, number]) => void;
+  },
+  { 
+    coordinates: [number, number]; 
+    onCenterChanged: (coords: [number, number]) => void;
+  }
+>(function MapContainer({ 
   coordinates, 
-  onCenterChanged 
-}: { 
-  coordinates: [number, number]; 
-  onCenterChanged: (coords: [number, number]) => void;
-}) {
+  onCenterChanged
+}, controlRef) {
   // Create a ref for the map instance
   const mapRef = useRef<{
     mapInstance: mapboxgl.Map | null;
-    setCenter: (coordinates: [number, number]) => void;
+    setCenter: (coordinates: [number, number], updateCamera?: boolean) => void;
     getCenter: () => [number, number];
     isInitialized: () => boolean;
     addMarkers: (markers: Array<{ coordinates: [number, number], element?: HTMLElement, popup?: { content: string, offset?: number } }>) => void;
   }>(null);
   
+  // Expose the centerMap function through the ref
+  useImperativeHandle(controlRef, () => ({
+    centerMap: (coords: [number, number]) => {
+      if (mapRef.current && mapRef.current.isInitialized()) {
+        mapRef.current.setCenter(coords, true);
+      }
+    }
+  }), []);
+  
   // Use a ref to track the last update time to prevent update loops
   const lastUpdateTime = useRef<number>(0);
+  const lastCoordinates = useRef<[number, number]>(coordinates);
+  const isDragging = useRef<boolean>(false);
   
   // This function handles map center changes when the user drags the map
   const handleMapCenterChanged = useCallback((coords: [number, number]) => {
+    // Only update if dragging (user initiated) or if it's an external update
+    if (!isDragging.current && 
+        lastCoordinates.current[0] === coords[0] && 
+        lastCoordinates.current[1] === coords[1]) {
+      return;
+    }
+    
     // Get current timestamp
     const now = Date.now();
     
-    // Simple debounce - ignore updates that are too close together (50ms)
-    if (now - lastUpdateTime.current < 50) return;
+    // Skip updates that are too close together (rate limiting)
+    if (now - lastUpdateTime.current < 30) return;
     
-    // Update the timestamp
+    // Update the timestamp and last coordinates
     lastUpdateTime.current = now;
+    lastCoordinates.current = [...coords];
     
-    // Log the coordinates for debugging
-    console.log('[MapContainer] Map center changed:', coords);
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MapContainer] Map center changed:', coords);
+    }
     
-    // Always update parent component immediately with new coordinates
-    onCenterChanged(coords);
+    // Update parent component with the new coordinates - force a new array to trigger React updates
+    onCenterChanged([...coords]);
+  }, [onCenterChanged]);
+  
+  // Setup drag tracking
+  useEffect(() => {
+    if (!mapRef.current || !mapRef.current.isInitialized() || !mapRef.current.mapInstance) return;
+    
+    const map = mapRef.current.mapInstance;
+    
+    // Track when map is being dragged
+    const onDragStart = () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MapContainer] Drag started');
+      }
+      isDragging.current = true;
+    };
+    
+    const onDrag = () => {
+      if (!isDragging.current) return;
+      
+      // Get current position during drag
+      const center = map.getCenter();
+      const currentCoords: [number, number] = [center.lng, center.lat];
+      
+      // Update last coordinates and notify parent immediately
+      lastCoordinates.current = [...currentCoords];
+      
+      // Notify parent immediately about position change during drag
+      onCenterChanged([...currentCoords]);
+    };
+    
+    const onDragEnd = () => {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MapContainer] Drag ended');
+      }
+      isDragging.current = false;
+      
+      // Get final position
+      const center = map.getCenter();
+      const finalCoords: [number, number] = [center.lng, center.lat];
+      
+      // Update last coordinates
+      lastCoordinates.current = [...finalCoords];
+      
+      // Notify parent
+      onCenterChanged([...finalCoords]);
+    };
+    
+    // Add event listeners
+    map.on('dragstart', onDragStart);
+    map.on('drag', onDrag);
+    map.on('dragend', onDragEnd);
+    
+    return () => {
+      // Clean up event listeners
+      if (map) {
+        map.off('dragstart', onDragStart);
+        map.off('drag', onDrag);
+        map.off('dragend', onDragEnd);
+      }
+    };
   }, [onCenterChanged]);
   
   // This effect handles external coordinate changes (like from search results)
   useEffect(() => {
-    // Only proceed if map is initialized
-    if (!mapRef.current || !mapRef.current.isInitialized()) return;
-    
-    console.log('[MapContainer] Coordinates changed externally:', coordinates);
-    
-    // Always update the map position when coordinates change from parent
-    mapRef.current.setCenter(coordinates);
+    // Update the reference to avoid drifting
+    if (coordinates[0] !== lastCoordinates.current[0] || coordinates[1] !== lastCoordinates.current[1]) {
+      lastCoordinates.current = coordinates;
+      
+      // Skip if map is not initialized
+      if (!mapRef.current || !mapRef.current.isInitialized()) return;
+      
+      // Skip if currently dragging (user triggered)
+      if (isDragging.current) return;
+      
+      // For external updates (search results), move the camera
+      mapRef.current.setCenter(coordinates, true);
+    }
   }, [coordinates]);
+  
+  // Important: Use useMemo to prevent recreating this node
+  const mapElement = useMemo(() => (
+    <Map
+      ref={mapRef}
+      initialCenter={lastCoordinates.current}
+      centerPin
+      interactive={true}
+      onCenterChanged={handleMapCenterChanged}
+    />
+  ), []); // Empty dependency array means this only runs once
   
   return (
     <div className="w-full h-full relative">
-      <Map
-        ref={mapRef}
-        initialCenter={coordinates}
-        centerPin
-        onCenterChanged={handleMapCenterChanged}
-      />
+      {mapElement}
     </div>
   );
-});  // Remove memo comparison function to ensure updates are always processed
+}), (prevProps, nextProps) => {
+  // Smart memo: only prevent re-render if coordinates haven't changed significantly
+  const coordsChanged = 
+    Math.abs(prevProps.coordinates[0] - nextProps.coordinates[0]) > 0.000001 ||
+    Math.abs(prevProps.coordinates[1] - nextProps.coordinates[1]) > 0.000001;
+  
+  // Allow re-render if coordinates changed significantly, prevent otherwise
+  return !coordsChanged;
+});
 
 // No longer using memo comparison function as it was causing issues with position updates
 
@@ -82,8 +188,19 @@ export default function AddEntryPage() {
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('Manila, Philippines')
-  const [coordinates, setCoordinates] = useState<[number, number]>([120.9842, 14.5995]) // Default to Manila
+  const [location, setLocation] = useState('')
+  const [coordinates, setCoordinates] = useState<[number, number]>([120.9842, 14.5995]) // Manila as fallback instead of [0,0]
+  
+  // Add a stable ref for coordinates to prevent unnecessary re-renders
+  const coordsRef = useRef<[number, number]>(coordinates);
+  
+  // Add a ref to directly access the map for programmatic control
+  const mapControlRef = useRef<{
+    centerMap: (coords: [number, number]) => void;
+  }>({
+    centerMap: () => {}
+  });
+  
   const [severity, setSeverity] = useState<'minor' | 'major'>('minor')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -106,6 +223,119 @@ export default function AddEntryPage() {
   const [submittedEntry, setSubmittedEntry] = useState<RoadCrackEntry | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   
+  // New state for dragging pin
+  const [isDraggingPin, setIsDraggingPin] = useState(false);
+  
+  // Create a ref to store the last drag timestamp
+  const lastDragTimestampRef = useRef(0);
+  
+  const [showLocationFeedback, setShowLocationFeedback] = useState(false);
+  
+  // Function to handle map center changed (when user drags the map)
+  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
+    }
+    
+    // Create a fresh copy of coordinates to ensure React state updates
+    const freshCoords: [number, number] = [coords[0], coords[1]];
+    const lng = freshCoords[0];
+    const lat = freshCoords[1];
+    
+    // Update ref immediately to maintain consistency
+    coordsRef.current = freshCoords;
+    
+    // Set dragging pin state to true to highlight coordinates
+    setIsDraggingPin(true);
+    
+    // Update coordinates state with functional update to prevent race conditions
+    // Use requestAnimationFrame to batch updates and avoid excessive re-renders
+    requestAnimationFrame(() => {
+      setCoordinates(prevCoords => {
+        // Only update if coordinates have changed significantly
+        if (
+          Math.abs(prevCoords[0] - freshCoords[0]) < 0.000001 && 
+          Math.abs(prevCoords[1] - freshCoords[1]) < 0.000001
+        ) {
+          return prevCoords;
+        }
+        return freshCoords;
+      });
+      
+      // Immediately set a temporary location name for better responsiveness
+      const tempLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      setLocation(tempLocation);
+    });
+    
+    // Store the last drag timestamp to prevent race conditions
+    const dragTimestamp = Date.now();
+    lastDragTimestampRef.current = dragTimestamp;
+    
+    // Show loading state
+    setIsSearching(true);
+    
+    // Clear any existing timeout
+    const timeoutId = setTimeout(() => {
+      // Only proceed if this is still the most recent drag event
+      if (dragTimestamp !== lastDragTimestampRef.current) {
+        return;
+      }
+      
+      // Reset dragging pin state after debounce
+      setIsDraggingPin(false);
+      
+      // Reverse geocode to get location name
+      const reverseGeocode = async () => {
+        try {
+          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+          const response = await fetch(
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[AddEntryPage] Geocoding data:', data);
+            }
+            
+            // Ensure we're still looking at the same coordinates
+            if (coordsRef.current[0] !== lng || coordsRef.current[1] !== lat) {
+              console.log('[AddEntryPage] Coordinates changed during geocoding, discarding result');
+              return;
+            }
+            
+            if (data.features && data.features.length > 0) {
+              // Get the most relevant place name
+              const placeName = data.features[0].place_name;
+              // Only update the location name, NOT the coordinates
+              setLocation(placeName);
+            } else {
+              // For locations with no features (like oceans), use coordinates with indicator
+              const waterLocation = `Water location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+              setLocation(waterLocation);
+            }
+          } else {
+            throw new Error('Failed to fetch location data');
+          }
+        } catch (error) {
+          console.error('[AddEntryPage] Error in reverse geocoding:', error);
+          // Fallback to showing coordinates
+          const fallbackLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+          setLocation(fallbackLocation);
+        } finally {
+          // Hide loading state
+          setIsSearching(false);
+        }
+      };
+      
+      // Execute the reverse geocoding
+      reverseGeocode();
+    }, 300);
+    
+    // Return cleanup function to clear timeout if component unmounts or function is called again
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -170,8 +400,14 @@ export default function AddEntryPage() {
     // Update location state with the selected place name
     setLocation(result.place_name);
     
+    // Update coordsRef first for consistency
+    coordsRef.current = [...result.center];
+    
     // Update coordinates with the selected location's coordinates
-    setCoordinates(result.center);
+    setCoordinates([...result.center]);
+    
+    // Directly center the map for immediate visual feedback
+    mapControlRef.current.centerMap(result.center);
     
     // Clear search results and query
     setSearchResults([]);
@@ -183,26 +419,11 @@ export default function AddEntryPage() {
       mapContainer.current.scrollIntoView({ behavior: 'smooth' });
     }
     
-    // Provide visual feedback that the location has been selected
-    const feedbackEl = document.createElement('div');
-    feedbackEl.className = 'location-selected-feedback';
-    feedbackEl.style.position = 'absolute';
-    feedbackEl.style.top = '50%';
-    feedbackEl.style.left = '50%';
-    feedbackEl.style.transform = 'translate(-50%, -50%)';
-    feedbackEl.style.backgroundColor = 'rgba(255, 203, 20, 0.7)';
-    feedbackEl.style.borderRadius = '50%';
-    feedbackEl.style.width = '60px';
-    feedbackEl.style.height = '60px';
-    feedbackEl.style.animation = 'pulse 0.5s ease-out';
-    if (mapContainer.current) {
-      mapContainer.current.appendChild(feedbackEl);
-      setTimeout(() => {
-        if (mapContainer.current && mapContainer.current.contains(feedbackEl)) {
-          mapContainer.current.removeChild(feedbackEl);
-        }
-      }, 500);
-    }
+    // Show feedback animation
+    setShowLocationFeedback(true);
+    setTimeout(() => {
+      setShowLocationFeedback(false);
+    }, 500);
     
     // Update current step to 2 (location selection)
     setCurrentStep(2);
@@ -221,7 +442,30 @@ export default function AddEntryPage() {
       async (position) => {
         const { longitude, latitude } = position.coords;
         const newCoordinates: [number, number] = [longitude, latitude];
-        setCoordinates(newCoordinates);
+        
+        // Update coordsRef first to maintain consistency
+        coordsRef.current = [...newCoordinates];
+        
+        // Force a state update with a new array to ensure React detects the change
+        setCoordinates([...newCoordinates]);
+        
+        // Directly center the map for immediate visual feedback
+        mapControlRef.current.centerMap(newCoordinates);
+        
+        // Scroll to map if needed
+        if (mapContainer.current) {
+          mapContainer.current.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Show feedback animation
+        setShowLocationFeedback(true);
+        setTimeout(() => {
+          setShowLocationFeedback(false);
+        }, 500);
+        
+        // Temporary location name for better responsiveness
+        const tempLocation = `Location at ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setLocation(tempLocation);
         
         // Reverse geocode to get location name
         try {
@@ -233,14 +477,14 @@ export default function AddEntryPage() {
           if (response.ok) {
             const data = await response.json();
             if (data.features && data.features.length > 0) {
-              setLocation(data.features[0].place_name);
-            } else {
-              setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              // Only update if we're still looking at the same coordinates
+              if (coordsRef.current[0] === longitude && coordsRef.current[1] === latitude) {
+                setLocation(data.features[0].place_name);
+              }
             }
           }
         } catch (error) {
           console.error('Error reverse geocoding:', error);
-          setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } finally {
           setIsGettingCurrentLocation(false);
         }
@@ -252,117 +496,21 @@ export default function AddEntryPage() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  };  
-  
-  // Create a ref to store the last drag timestamp (instead of attaching to function)
-  const lastDragTimestampRef = useRef(0);
-
-  // Function to handle map center changed (when user drags the map)
-  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
-    console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
-    
-    // Update coordinates state - ensure we update this immediately
-    console.log('[AddEntryPage] Previous coordinates:', coordinates);
-    setCoordinates(coords);
-    console.log('[AddEntryPage] Updated coordinates state');
-    
-    // Show loading state
-    console.log('[AddEntryPage] Setting loading states');
-    setIsSearching(true);
-    setShowSearchResults(false); // Hide search results when map is dragged
-    
-    // Provide visual feedback that the location is being processed
-    const [lng, lat] = coords;
-    
-    // Immediately set a temporary location name while we fetch the actual name
-    const tempLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    console.log('[AddEntryPage] Setting temporary location:', tempLocation);
-    setLocation(tempLocation);
-    
-    // Store the last drag timestamp to prevent race conditions
-    const dragTimestamp = Date.now();
-    const prevTimestamp = lastDragTimestampRef.current || 0;
-    console.log('[AddEntryPage] Updating drag timestamp from', prevTimestamp, 'to', dragTimestamp);
-    lastDragTimestampRef.current = dragTimestamp;
-    
-    // Debounce the reverse geocoding to avoid too many API calls while dragging
-    console.log('[AddEntryPage] Setting debounce timeout for reverse geocoding');
-    const debounceTimeout = setTimeout(() => {
-      console.log('[AddEntryPage] Debounce timeout fired, timestamp check:', 
-        dragTimestamp === lastDragTimestampRef.current ? 'MATCH' : 'OUTDATED');
-      
-      // Only proceed if this is still the most recent drag event
-      if (dragTimestamp !== lastDragTimestampRef.current) {
-        console.log('[AddEntryPage] Skipping outdated reverse geocode request');
-        return;
-      }
-      
-      // Reverse geocode to get location name
-      console.log('[AddEntryPage] Starting reverse geocoding for:', coords);
-      const reverseGeocode = async () => {
-        console.log('[AddEntryPage] Inside reverseGeocode function for:', [lng, lat]);
-        try {
-          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-          console.log('[AddEntryPage] Fetching from Mapbox Geocoding API');
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
-          );
-          
-          if (response.ok) {
-            console.log('[AddEntryPage] Geocoding API response received successfully');
-            const data = await response.json();
-            console.log('[AddEntryPage] Geocoding data:', data);
-            
-            if (data.features && data.features.length > 0) {
-              // Clear all event listeners
-              clearTimeout(debounceTimeout);
-              lastDragTimestampRef.current = 0;
-              console.log('[AddEntryPage] Clearing state');
-              // Get the most relevant place name
-              const placeName = data.features[0].place_name;
-              console.log('[AddEntryPage] Setting location to:', placeName);
-              setLocation(placeName);
-              
-              // Clear search query to show the selected location clearly
-              console.log('[AddEntryPage] Clearing search query');
-              setSearchQuery('');
-            } else {
-              // If no results, just show coordinates
-              const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-              console.log('[AddEntryPage] No features found, using fallback:', fallbackLocation);
-              setLocation(fallbackLocation);
-            }
-          } else {
-            console.error('[AddEntryPage] Geocoding API response not OK:', response.status);
-            throw new Error('Failed to fetch location data');
-          }
-        } catch (error) {
-          console.error('[AddEntryPage] Error in reverse geocoding:', error);
-          // Fallback to showing coordinates
-          const fallbackLocation = `Location at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          console.log('[AddEntryPage] Setting fallback location after error:', fallbackLocation);
-          setLocation(fallbackLocation);
-        } finally {
-          // Hide loading state
-          console.log('[AddEntryPage] Finished reverse geocoding, hiding loading state');
-          setIsSearching(false);
-        }
-      };
-      
-      // Execute the reverse geocoding
-      console.log('[AddEntryPage] Executing reverseGeocode function');
-      reverseGeocode();
-    }, 300); // Wait 300ms after dragging stops before geocoding
-  }, [coordinates, setCoordinates, setLocation, setSearchQuery, setShowSearchResults, setIsSearching]);
-
-  // lastDragTimestampRef is already used instead of static property
+  };
 
   // Navigate between steps
   const goToNextStep = () => {
     if (currentStep < 3) {
-      setCurrentStep(currentStep + 1)
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      
+      // Auto-detect location when entering step 2
+      if (nextStep === 2 && navigator.geolocation) {
+        // Automatically get user's current location
+        getCurrentLocation();
+      }
     }
-  }
+  };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
@@ -393,7 +541,7 @@ export default function AddEntryPage() {
       formData.append('severity', severity);
       formData.append('image', selectedFile);
       // Add user_id - using a default value if not available
-      formData.append('user_id', '1'); // Use appropriate user ID from your auth system
+      formData.append('user_id', '00472f53-73a0-4912-a79b-68407e5998e3'); // Use the actual user ID from database
       
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -436,6 +584,17 @@ export default function AddEntryPage() {
     }
   };
 
+  // Create a stable instance of MapContainer that won't be recreated on rerenders
+  const stableMapContainer = useMemo(() => {
+    return (
+      <MapContainer 
+        coordinates={coordinates}
+        onCenterChanged={handleMapCenterChanged}
+        ref={mapControlRef}
+      />
+    );
+  }, [handleMapCenterChanged, coordinates]);
+
   return (
     <div className="flex flex-col w-full max-w-3xl mx-auto p-4 pt-20 pb-24 md:pt-24 md:pb-8">
       {/* Success Modal */}
@@ -453,19 +612,24 @@ export default function AddEntryPage() {
       
       {/* Progress Steps */}
       <div className="flex items-center justify-between mb-8 relative">
-        <div className="absolute left-0 right-0 h-0.5 bg-gray-200" style={{ top: 'calc(50% - 12px)' }}></div>
+        {/* Progress line - positioned behind the circles */}
+        <div className="absolute left-0 right-0 h-0.5 bg-border dark:bg-border top-1/2 transform -translate-y-1/2"></div>
         {[1, 2, 3].map((step) => (
-          <div key={step} className="flex flex-col items-center z-10">
+          <div key={step} className="flex flex-col items-center relative z-20">
             <div 
-              className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${currentStep === step 
-                ? 'bg-dalan-yellow border-black text-black font-bold' 
-                : currentStep > step 
-                  ? 'bg-green-500 border-green-600 text-white' 
-                  : 'bg-white border-gray-300 text-black'}`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+                currentStep === step 
+                  ? 'bg-dalan-yellow border-foreground text-foreground font-bold' 
+                  : currentStep > step 
+                    ? 'bg-green-500 border-green-600 text-white shadow-sm' 
+                    : 'bg-background border-border text-foreground'
+              }`}
             >
               {currentStep > step ? <Check size={16} /> : step}
             </div>
-            <span className="text-xs mt-1 text-center font-medium">
+            <span className={`text-xs mt-2 text-center font-medium transition-colors ${
+              currentStep >= step ? 'text-foreground' : 'text-muted-foreground'
+            }`}>
               {step === 1 ? 'Photo' : step === 2 ? 'Location' : 'Details'}
             </span>
           </div>
@@ -560,10 +724,10 @@ export default function AddEntryPage() {
                 type="button"
                 onClick={goToNextStep}
                 disabled={!previewUrl}
-                className="flex items-center justify-center py-2 px-6 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center h-10 px-5 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
-                <ChevronRight size={18} className="ml-1" />
+                <ChevronRight size={16} className="ml-1.5" />
               </button>
             </div>
           </div>
@@ -572,7 +736,7 @@ export default function AddEntryPage() {
         {/* Step 2: Pin Location */}
         {currentStep === 2 && (
           <div className="space-y-4 animate-fadeIn" ref={mapContainer}>
-            {/* Search box - now above the map */}
+            {/* Search box with integrated location button */}
             <div className="mb-4">
               <label htmlFor="search-location" className="block text-sm font-medium mb-2 text-foreground">Search Location</label>
               <div className="relative w-full">
@@ -585,7 +749,7 @@ export default function AddEntryPage() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => setShowSearchResults(true)}
-                      className="w-full px-3 py-1 bg-background border-none focus:ring-0 focus:outline-none text-foreground placeholder:text-muted-foreground"
+                      className="flex-1 px-3 py-1 bg-background border-none focus:ring-0 focus:outline-none text-foreground placeholder:text-muted-foreground"
                       placeholder="Search for a location..."
                       aria-expanded={showSearchResults}
                       aria-autocomplete="list"
@@ -598,7 +762,7 @@ export default function AddEntryPage() {
                           setSearchQuery('');
                           setShowSearchResults(false);
                         }}
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        className="p-1 rounded-full hover:bg-muted transition-colors mr-2"
                         aria-label="Clear search"
                       >
                         <X size={16} className="text-foreground" />
@@ -607,10 +771,25 @@ export default function AddEntryPage() {
                     {isSearching && (
                       <Loader className="mr-2 animate-spin text-foreground" size={16} />
                     )}
+                    {/* Compact location button */}
+                    <button 
+                      type="button" 
+                      onClick={getCurrentLocation}
+                      disabled={isGettingCurrentLocation}
+                      className="p-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-all ml-2"
+                      title="Use my current location"
+                      aria-label="Use my current location"
+                    >
+                      {isGettingCurrentLocation ? (
+                        <Loader size={16} className="animate-spin" />
+                      ) : (
+                        <Navigation size={16} />
+                      )}
+                    </button>
                   </div>
                 </div>
                 
-                {/* Search results dropdown - modal-like overlay with proper theme */}
+                {/* Search results dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
                   <div 
                     id="search-results"
@@ -641,52 +820,28 @@ export default function AddEntryPage() {
               </div>
             </div>
             
-            {/* Map - now below search box */}
-            <div className="h-80 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shadow-sm">
-              <MapContainer 
-                coordinates={coordinates}
-                onCenterChanged={handleMapCenterChanged}
-              />
+            {/* Map */}
+            <div className="h-80 rounded-lg overflow-hidden border border-border shadow-sm relative">
+              {stableMapContainer}
+              {showLocationFeedback && (
+                <div 
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-dalan-yellow/70 rounded-full w-[60px] h-[60px] animate-pulse"
+                  style={{ animation: 'pulse 0.5s ease-out' }}
+                />
+              )}
             </div>
             
-            {/* Selected location display - improved styling with theme consistency */}
-            <div className="mt-4 p-4 border border-border rounded-md bg-background shadow-sm">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                <div className="flex-grow">
-                  <p className="text-sm font-medium mb-2 text-foreground">Pin Location</p>
-                  <div className="flex items-start">
-                    <MapPin size={18} className="mr-2 text-foreground flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {location || 'No location selected'}
-                      </p>
-                      {coordinates && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Coordinates: {coordinates[1].toFixed(5)}, {coordinates[0].toFixed(5)}
-                        </p>
-                      )}
-                    </div>
+            {/* Compact location display */}
+            <div className="p-3 border border-border rounded-md bg-card/50">
+              <div className="flex items-center">
+                <MapPin size={16} className="mr-2 text-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {location || 'No location selected'}
+                  </p>
+                  <div className={`text-xs font-mono mt-0.5 ${isDraggingPin ? 'text-dalan-yellow font-bold' : 'text-muted-foreground'} transition-all duration-75`}>
+                    {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
                   </div>
-                </div>
-                <div className="flex-shrink-0">
-                  <button 
-                    type="button" 
-                    onClick={getCurrentLocation}
-                    disabled={isGettingCurrentLocation}
-                    className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  >
-                    {isGettingCurrentLocation ? (
-                      <>
-                        <Loader size={16} className="mr-2 animate-spin" />
-                        Getting location...
-                      </>
-                    ) : (
-                      <>
-                        <Navigation size={16} className="mr-2" />
-                        Use my current location
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
               
@@ -791,24 +946,24 @@ export default function AddEntryPage() {
               <button
                 type="button"
                 onClick={goToPreviousStep}
-                className="flex items-center justify-center py-2 px-6 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors"
+                className="flex items-center justify-center h-10 px-5 border border-border text-foreground font-medium rounded-md hover:bg-muted transition-colors"
               >
-                <ChevronLeft size={18} className="mr-1" />
+                <ChevronLeft size={16} className="mr-1.5" />
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center justify-center py-2 px-6 bg-dalan-yellow text-black font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
+                className="flex items-center justify-center h-10 px-5 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2"></div>
                     Processing...
                   </>
                 ) : isSuccess ? (
                   <>
-                    <Check size={18} className="mr-2" />
+                    <Check size={16} className="mr-1.5" />
                     Submitted!
                   </>
                 ) : (

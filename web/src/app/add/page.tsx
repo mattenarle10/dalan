@@ -612,19 +612,24 @@ export default function AddEntryPage() {
       
       {/* Progress Steps */}
       <div className="flex items-center justify-between mb-8 relative">
-        <div className="absolute left-0 right-0 h-0.5 bg-gray-200" style={{ top: 'calc(50% - 12px)' }}></div>
+        {/* Progress line - positioned behind the circles */}
+        <div className="absolute left-0 right-0 h-0.5 bg-border dark:bg-border top-1/2 transform -translate-y-1/2"></div>
         {[1, 2, 3].map((step) => (
-          <div key={step} className="flex flex-col items-center z-10">
+          <div key={step} className="flex flex-col items-center relative z-20">
             <div 
-              className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${currentStep === step 
-                ? 'bg-dalan-yellow border-black text-black font-bold' 
-                : currentStep > step 
-                  ? 'bg-green-500 border-green-600 text-white' 
-                  : 'bg-white border-gray-300 text-black'}`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+                currentStep === step 
+                  ? 'bg-dalan-yellow border-foreground text-foreground font-bold' 
+                  : currentStep > step 
+                    ? 'bg-green-500 border-green-600 text-white shadow-sm' 
+                    : 'bg-background border-border text-foreground'
+              }`}
             >
               {currentStep > step ? <Check size={16} /> : step}
             </div>
-            <span className="text-xs mt-1 text-center font-medium">
+            <span className={`text-xs mt-2 text-center font-medium transition-colors ${
+              currentStep >= step ? 'text-foreground' : 'text-muted-foreground'
+            }`}>
               {step === 1 ? 'Photo' : step === 2 ? 'Location' : 'Details'}
             </span>
           </div>
@@ -731,7 +736,7 @@ export default function AddEntryPage() {
         {/* Step 2: Pin Location */}
         {currentStep === 2 && (
           <div className="space-y-4 animate-fadeIn" ref={mapContainer}>
-            {/* Search box - now above the map */}
+            {/* Search box with integrated location button */}
             <div className="mb-4">
               <label htmlFor="search-location" className="block text-sm font-medium mb-2 text-foreground">Search Location</label>
               <div className="relative w-full">
@@ -744,7 +749,7 @@ export default function AddEntryPage() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => setShowSearchResults(true)}
-                      className="w-full px-3 py-1 bg-background border-none focus:ring-0 focus:outline-none text-foreground placeholder:text-muted-foreground"
+                      className="flex-1 px-3 py-1 bg-background border-none focus:ring-0 focus:outline-none text-foreground placeholder:text-muted-foreground"
                       placeholder="Search for a location..."
                       aria-expanded={showSearchResults}
                       aria-autocomplete="list"
@@ -757,7 +762,7 @@ export default function AddEntryPage() {
                           setSearchQuery('');
                           setShowSearchResults(false);
                         }}
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        className="p-1 rounded-full hover:bg-muted transition-colors mr-2"
                         aria-label="Clear search"
                       >
                         <X size={16} className="text-foreground" />
@@ -766,10 +771,25 @@ export default function AddEntryPage() {
                     {isSearching && (
                       <Loader className="mr-2 animate-spin text-foreground" size={16} />
                     )}
+                    {/* Compact location button */}
+                    <button 
+                      type="button" 
+                      onClick={getCurrentLocation}
+                      disabled={isGettingCurrentLocation}
+                      className="p-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-all ml-2"
+                      title="Use my current location"
+                      aria-label="Use my current location"
+                    >
+                      {isGettingCurrentLocation ? (
+                        <Loader size={16} className="animate-spin" />
+                      ) : (
+                        <Navigation size={16} />
+                      )}
+                    </button>
                   </div>
                 </div>
                 
-                {/* Search results dropdown - modal-like overlay with proper theme */}
+                {/* Search results dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
                   <div 
                     id="search-results"
@@ -800,54 +820,28 @@ export default function AddEntryPage() {
               </div>
             </div>
             
-            {/* Map with a stable instance to prevent remounting */}
-            <div className="h-80 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shadow-sm relative" ref={mapContainer}>
+            {/* Map */}
+            <div className="h-80 rounded-lg overflow-hidden border border-border shadow-sm relative">
               {stableMapContainer}
               {showLocationFeedback && (
                 <div 
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-300/70 rounded-full w-[60px] h-[60px] animate-pulse"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-dalan-yellow/70 rounded-full w-[60px] h-[60px] animate-pulse"
                   style={{ animation: 'pulse 0.5s ease-out' }}
                 />
               )}
             </div>
             
-            {/* Selected location display - improved styling with theme consistency */}
-            <div className="mt-4 p-4 border border-border rounded-md bg-background shadow-sm">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-                <div className="flex-grow">
-                  <p className="text-sm font-medium mb-2 text-foreground">Pin Location</p>
-                  <div className="flex items-start">
-                    <MapPin size={18} className="mr-2 text-foreground flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {location || 'No location selected'}
-                      </p>
-                      <div className={`text-xs font-mono ${isDraggingPin ? 'bg-primary/10 font-bold animate-pulse' : ''} text-muted-foreground mt-1 p-1 rounded transition-all duration-75`}>
-                        {/* Force re-render by using the actual coordinate values in the key */}
-                        {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
-                      </div>
-                    </div>
+            {/* Compact location display */}
+            <div className="p-3 border border-border rounded-md bg-card/50">
+              <div className="flex items-center">
+                <MapPin size={16} className="mr-2 text-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {location || 'No location selected'}
+                  </p>
+                  <div className={`text-xs font-mono mt-0.5 ${isDraggingPin ? 'text-dalan-yellow font-bold' : 'text-muted-foreground'} transition-all duration-75`}>
+                    {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
                   </div>
-                </div>
-                <div className="flex-shrink-0">
-                  <button 
-                    type="button" 
-                    onClick={getCurrentLocation}
-                    disabled={isGettingCurrentLocation}
-                    className="flex items-center justify-center w-full md:w-auto px-4 py-2 bg-primary text-primary-foreground font-medium rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  >
-                    {isGettingCurrentLocation ? (
-                      <>
-                        <Loader size={16} className="mr-2 animate-spin" />
-                        Getting location...
-                      </>
-                    ) : (
-                      <>
-                        <Navigation size={16} className="mr-2" />
-                        Use my current location
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
               

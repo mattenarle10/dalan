@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, memo, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { MapPin, Upload, AlertTriangle, Check, Camera, ChevronLeft, ChevronRight, Info, X, Loader, Navigation } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
@@ -15,13 +15,18 @@ const Map = dynamic(() => import('@/components/Map'), {
 })
 
 // Create a stable MapContainer component that won't remount when coordinates change
-const MapContainer = memo(function MapContainer({ 
+const MapContainer = memo(forwardRef<
+  {
+    centerMap: (coords: [number, number]) => void;
+  },
+  { 
+    coordinates: [number, number]; 
+    onCenterChanged: (coords: [number, number]) => void;
+  }
+>(function MapContainer({ 
   coordinates, 
-  onCenterChanged 
-}: { 
-  coordinates: [number, number]; 
-  onCenterChanged: (coords: [number, number]) => void;
-}) {
+  onCenterChanged
+}, controlRef) {
   // Create a ref for the map instance
   const mapRef = useRef<{
     mapInstance: mapboxgl.Map | null;
@@ -30,6 +35,15 @@ const MapContainer = memo(function MapContainer({
     isInitialized: () => boolean;
     addMarkers: (markers: Array<{ coordinates: [number, number], element?: HTMLElement, popup?: { content: string, offset?: number } }>) => void;
   }>(null);
+  
+  // Expose the centerMap function through the ref
+  useImperativeHandle(controlRef, () => ({
+    centerMap: (coords: [number, number]) => {
+      if (mapRef.current && mapRef.current.isInitialized()) {
+        mapRef.current.setCenter(coords, true);
+      }
+    }
+  }), []);
   
   // Use a ref to track the last update time to prevent update loops
   const lastUpdateTime = useRef<number>(0);
@@ -127,16 +141,18 @@ const MapContainer = memo(function MapContainer({
   // This effect handles external coordinate changes (like from search results)
   useEffect(() => {
     // Update the reference to avoid drifting
-    lastCoordinates.current = coordinates;
-    
-    // Skip if map is not initialized
-    if (!mapRef.current || !mapRef.current.isInitialized()) return;
-    
-    // Skip if currently dragging (user triggered)
-    if (isDragging.current) return;
-    
-    // For external updates (search results), move the camera
-    mapRef.current.setCenter(coordinates, true);
+    if (coordinates[0] !== lastCoordinates.current[0] || coordinates[1] !== lastCoordinates.current[1]) {
+      lastCoordinates.current = coordinates;
+      
+      // Skip if map is not initialized
+      if (!mapRef.current || !mapRef.current.isInitialized()) return;
+      
+      // Skip if currently dragging (user triggered)
+      if (isDragging.current) return;
+      
+      // For external updates (search results), move the camera
+      mapRef.current.setCenter(coordinates, true);
+    }
   }, [coordinates]);
   
   // Important: Use useMemo to prevent recreating this node
@@ -155,9 +171,14 @@ const MapContainer = memo(function MapContainer({
       {mapElement}
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Always return true to prevent component from rerendering due to prop changes
-  return true;
+}), (prevProps, nextProps) => {
+  // Smart memo: only prevent re-render if coordinates haven't changed significantly
+  const coordsChanged = 
+    Math.abs(prevProps.coordinates[0] - nextProps.coordinates[0]) > 0.000001 ||
+    Math.abs(prevProps.coordinates[1] - nextProps.coordinates[1]) > 0.000001;
+  
+  // Allow re-render if coordinates changed significantly, prevent otherwise
+  return !coordsChanged;
 });
 
 // No longer using memo comparison function as it was causing issues with position updates
@@ -167,11 +188,18 @@ export default function AddEntryPage() {
   // Form state
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('Manila, Philippines')
-  const [coordinates, setCoordinates] = useState<[number, number]>([120.9842, 14.5995]) // Default to Manila
+  const [location, setLocation] = useState('')
+  const [coordinates, setCoordinates] = useState<[number, number]>([0, 0]) // Start with neutral coordinates
   
   // Add a stable ref for coordinates to prevent unnecessary re-renders
   const coordsRef = useRef<[number, number]>(coordinates);
+  
+  // Add a ref to directly access the map for programmatic control
+  const mapControlRef = useRef<{
+    centerMap: (coords: [number, number]) => void;
+  }>({
+    centerMap: () => {}
+  });
   
   const [severity, setSeverity] = useState<'minor' | 'major'>('minor')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -372,8 +400,14 @@ export default function AddEntryPage() {
     // Update location state with the selected place name
     setLocation(result.place_name);
     
+    // Update coordsRef first for consistency
+    coordsRef.current = [...result.center];
+    
     // Update coordinates with the selected location's coordinates
-    setCoordinates(result.center);
+    setCoordinates([...result.center]);
+    
+    // Directly center the map for immediate visual feedback
+    mapControlRef.current.centerMap(result.center);
     
     // Clear search results and query
     setSearchResults([]);
@@ -408,7 +442,30 @@ export default function AddEntryPage() {
       async (position) => {
         const { longitude, latitude } = position.coords;
         const newCoordinates: [number, number] = [longitude, latitude];
-        setCoordinates(newCoordinates);
+        
+        // Update coordsRef first to maintain consistency
+        coordsRef.current = [...newCoordinates];
+        
+        // Force a state update with a new array to ensure React detects the change
+        setCoordinates([...newCoordinates]);
+        
+        // Directly center the map for immediate visual feedback
+        mapControlRef.current.centerMap(newCoordinates);
+        
+        // Scroll to map if needed
+        if (mapContainer.current) {
+          mapContainer.current.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Show feedback animation
+        setShowLocationFeedback(true);
+        setTimeout(() => {
+          setShowLocationFeedback(false);
+        }, 500);
+        
+        // Temporary location name for better responsiveness
+        const tempLocation = `Location at ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setLocation(tempLocation);
         
         // Reverse geocode to get location name
         try {
@@ -420,14 +477,14 @@ export default function AddEntryPage() {
           if (response.ok) {
             const data = await response.json();
             if (data.features && data.features.length > 0) {
-              setLocation(data.features[0].place_name);
-            } else {
-              setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              // Only update if we're still looking at the same coordinates
+              if (coordsRef.current[0] === longitude && coordsRef.current[1] === latitude) {
+                setLocation(data.features[0].place_name);
+              }
             }
           }
         } catch (error) {
           console.error('Error reverse geocoding:', error);
-          setLocation(`Location at ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         } finally {
           setIsGettingCurrentLocation(false);
         }
@@ -444,9 +501,23 @@ export default function AddEntryPage() {
   // Navigate between steps
   const goToNextStep = () => {
     if (currentStep < 3) {
-      setCurrentStep(currentStep + 1)
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      
+      // Auto-detect location when entering step 2
+      if (nextStep === 2) {
+        // Only auto-detect if we're still at the default Manila location
+        const isDefaultLocation = 
+          Math.abs(coordinates[0] - 120.9842) < 0.001 && 
+          Math.abs(coordinates[1] - 14.5995) < 0.001;
+        
+        if (isDefaultLocation && navigator.geolocation) {
+          // Automatically get user's current location
+          getCurrentLocation();
+        }
+      }
     }
-  }
+  };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
@@ -521,12 +592,15 @@ export default function AddEntryPage() {
   };
 
   // Create a stable instance of MapContainer that won't be recreated on rerenders
-  const stableMapContainer = useMemo(() => (
-    <MapContainer 
-      coordinates={coordinates}
-      onCenterChanged={handleMapCenterChanged}
-    />
-  ), [handleMapCenterChanged]);
+  const stableMapContainer = useMemo(() => {
+    return (
+      <MapContainer 
+        coordinates={coordinates}
+        onCenterChanged={handleMapCenterChanged}
+        ref={mapControlRef}
+      />
+    );
+  }, [handleMapCenterChanged, coordinates]);
 
   return (
     <div className="flex flex-col w-full max-w-3xl mx-auto p-4 pt-20 pb-24 md:pt-24 md:pb-8">

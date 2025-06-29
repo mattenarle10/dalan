@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { Map as MapboxMap, MapboxOptions } from 'mapbox-gl';
+import MapManager from '@/lib/mapManager';
 
 interface UseMapboxOptions {
   initialCenter: [number, number];
@@ -34,11 +35,12 @@ export function useMapbox({
   const [center, setCenter] = useState<[number, number]>(initialCenter);
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const eventHandlersSetup = useRef<boolean>(false);
+  const mapIdRef = useRef<string>('');
 
-  // Initialize map
+  // Initialize map using MapManager
   useEffect(() => {
     if (!mapContainerRef.current) return;
-    if (mapInstanceRef.current) return;
+    if (mapInstanceRef.current) return; // Already initialized
     
     let isMounted = true;
     
@@ -46,39 +48,30 @@ export function useMapbox({
       if (typeof window === 'undefined') return;
       
       try {
-        // Import mapbox-gl dynamically to avoid SSR issues
-        const mapboxgl = (await import('mapbox-gl')).default;
-        console.log('[useMapbox] Initializing map');
+        // Generate unique map ID based on container and current time
+        const mapId = `map_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        mapIdRef.current = mapId;
         
-        // Configure Mapbox
-        mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+        console.log('[useMapbox] Initializing map with MapManager:', mapId);
         
-        // Create map instance
-        const map = new mapboxgl.Map({
+        const mapManager = MapManager.getInstance();
+        const map = await mapManager.getMap(mapId, {
           container: mapContainerRef.current!,
-          style: style,
           center: initialCenter,
           zoom: zoom,
-          attributionControl: true,
+          style: style,
           interactive: interactive
         });
         
-        // Handle map load event
-        map.on('load', () => {
-          if (isMounted) {
-            console.log('[useMapbox] Map loaded successfully');
-            mapInstanceRef.current = map;
-            setIsLoaded(true);
-          }
-        });
-        
-        // Add error handler
-        map.on('error', (e) => {
-          console.error('[useMapbox] Mapbox error:', e.error);
-        });
-        
-        // Add navigation controls
-        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        if (isMounted) {
+          console.log('[useMapbox] Map loaded successfully via MapManager');
+          mapInstanceRef.current = map;
+          setIsLoaded(true);
+          
+          // Add navigation controls
+          const mapboxgl = (await import('mapbox-gl')).default;
+          map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        }
         
       } catch (error) {
         console.error('[useMapbox] Error initializing map:', error);
@@ -90,14 +83,15 @@ export function useMapbox({
     // Cleanup function
     return () => {
       isMounted = false;
-      if (mapInstanceRef.current) {
-        console.log('[useMapbox] Removing map instance due to component unmount');
-        mapInstanceRef.current.remove();
+      if (mapIdRef.current && mapInstanceRef.current) {
+        console.log('[useMapbox] Cleaning up map instance:', mapIdRef.current);
+        const mapManager = MapManager.getInstance();
+        mapManager.removeMap(mapIdRef.current);
         mapInstanceRef.current = null;
         eventHandlersSetup.current = false;
       }
     };
-  }, [initialCenter, zoom, style, interactive]);
+  }, []); // Remove dependencies to prevent re-initialization
 
   // Setup event handlers after map is initialized
   useEffect(() => {

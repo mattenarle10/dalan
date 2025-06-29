@@ -189,7 +189,7 @@ export default function AddEntryPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [location, setLocation] = useState('')
-  const [coordinates, setCoordinates] = useState<[number, number]>([0, 0]) // Start with neutral coordinates
+  const [coordinates, setCoordinates] = useState<[number, number]>([120.9842, 14.5995]) // Manila as fallback instead of [0,0]
   
   // Add a stable ref for coordinates to prevent unnecessary re-renders
   const coordsRef = useRef<[number, number]>(coordinates);
@@ -505,16 +505,9 @@ export default function AddEntryPage() {
       setCurrentStep(nextStep);
       
       // Auto-detect location when entering step 2
-      if (nextStep === 2) {
-        // Only auto-detect if we're still at the default Manila location
-        const isDefaultLocation = 
-          Math.abs(coordinates[0] - 120.9842) < 0.001 && 
-          Math.abs(coordinates[1] - 14.5995) < 0.001;
-        
-        if (isDefaultLocation && navigator.geolocation) {
-          // Automatically get user's current location
-          getCurrentLocation();
-        }
+      if (nextStep === 2 && navigator.geolocation) {
+        // Automatically get user's current location
+        getCurrentLocation();
       }
     }
   };

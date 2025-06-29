@@ -234,65 +234,74 @@ export function useMapbox({
       const mapboxgl = (await import('mapbox-gl')).default;
       const map = mapInstanceRef.current;
       
+      // Double check that map is still valid and has the required methods
+      if (!map.getCanvasContainer) {
+        console.warn('[useMapbox] Map instance is not fully initialized yet, skipping marker addition');
+        return;
+      }
+      
       // Clear existing markers
-      markersRef.current.forEach(marker => marker.remove());
+      markersRef.current.forEach(marker => {
+        try {
+          marker.remove();
+        } catch (e) {
+          console.warn('[useMapbox] Error removing existing marker:', e);
+        }
+      });
       markersRef.current = [];
       
       // Add new markers
       markers.forEach((markerData) => {
-        // Create custom marker element
-        const el = document.createElement('div');
-        el.className = 'custom-marker';
-        el.style.width = '32px';
-        el.style.height = '32px';
-        el.style.cursor = 'pointer';
-        
-        // Create SVG for the marker using the map-pin.svg design
-        el.innerHTML = `
-          <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12,0 C16.418278,0 20,3.581722 20,8 C20,12.418278 12,24 12,24 C12,24 4,12.418278 4,8 C4,3.581722 7.581722,0 12,0 Z" 
-                  fill="${markerData.severity === 'major' ? '#dc2626' : '#eab308'}" 
-                  stroke="#ffffff" 
-                  stroke-width="1"/>
-            <circle fill="#FFFFFF" cx="12" cy="8" r="4"/>
-          </svg>
-        `;
-        
-        // Create marker
-        const marker = new mapboxgl.Marker(el)
-          .setLngLat(markerData.position)
-          .addTo(map);
-        
-        // Add click handler
-        if (onMarkerClick && markerData.id) {
-          el.addEventListener('click', () => {
-            onMarkerClick(markerData.id!);
-          });
-        }
-        
-        // Add popup if specified
-        if (markerData.popup) {
-          const popup = new mapboxgl.Popup({ 
-            offset: 25,
-            closeButton: true,
-            closeOnClick: false
-          })
-          .setHTML(`<div style="padding: 8px; font-size: 14px;">${markerData.popup}</div>`);
+        try {
+          // Create custom marker element
+          const el = document.createElement('div');
+          el.className = 'custom-marker';
+          el.style.width = '32px';
+          el.style.height = '32px';
+          el.style.cursor = 'pointer';
           
-          marker.setPopup(popup);
+          // Create SVG for the marker using the map-pin.svg design
+          el.innerHTML = `
+            <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12,0 C16.418278,0 20,3.581722 20,8 C20,12.418278 12,24 12,24 C12,24 4,12.418278 4,8 C4,3.581722 7.581722,0 12,0 Z" 
+                    fill="${markerData.severity === 'major' ? '#dc2626' : '#eab308'}" 
+                    stroke="#ffffff" 
+                    stroke-width="1"/>
+              <circle fill="#FFFFFF" cx="12" cy="8" r="4"/>
+            </svg>
+          `;
+          
+          // Create marker with error handling
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat(markerData.position)
+            .addTo(map);
+          
+          // Add click handler
+          if (onMarkerClick && markerData.id) {
+            el.addEventListener('click', () => {
+              onMarkerClick(markerData.id!);
+            });
+          }
+          
+          markersRef.current.push(marker);
+        } catch (markerError) {
+          console.error('[useMapbox] Error adding individual marker:', markerError, 'for marker:', markerData);
         }
-        
-        markersRef.current.push(marker);
       });
     } catch (error) {
       console.error('[useMapbox] Error adding markers:', error);
     }
   }, [isLoaded, markers, onMarkerClick]);
 
-  // Update markers when they change
+  // Update markers when they change - with delay to ensure map is ready
   useEffect(() => {
-    if (isLoaded) {
-      addMarkersToMap();
+    if (isLoaded && mapInstanceRef.current) {
+      // Add a small delay to ensure map is fully ready
+      const timer = setTimeout(() => {
+        addMarkersToMap();
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
   }, [isLoaded, addMarkersToMap]);
 

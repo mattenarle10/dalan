@@ -85,5 +85,22 @@ FastAPI automatically generates interactive API documentation:
 - `GET /api/users/me` - Get current user
 
 ---
+# Navigate to your API folder
+cd /Users/matt/dalan/api
+
+# Create a fresh virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip
+
+# Install dependencies from requirements.txt
+pip install -r requirements.txt
+
+# Run your API server
+uvicorn main:app --reload
 
 See the root README for overall project details.

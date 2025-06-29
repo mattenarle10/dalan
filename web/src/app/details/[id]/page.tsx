@@ -340,6 +340,12 @@ export default function DetailsPage() {
                   <Map 
                     initialCenter={entry.coordinates}
                     zoom={16}
+                    markers={[{
+                      position: entry.coordinates,
+                      popup: entry.title,
+                      id: entry.id,
+                      severity: entry.severity
+                    }]}
                   />
                 </div>
               </div>

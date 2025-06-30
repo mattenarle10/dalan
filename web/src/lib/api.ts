@@ -2,6 +2,8 @@
  * API service for communicating with the backend
  */
 
+import { supabase } from './supabase'
+
 // Define interface for entry update data
 interface EntryUpdateData {
   title?: string;
@@ -14,6 +16,23 @@ interface EntryUpdateData {
 
 // Get the API URL from environment variables
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+/**
+ * Get auth headers with current user's session token
+ */
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession()
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+  
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`
+  }
+  
+  return headers
+}
 
 /**
  * Fetch all road crack entries with optional filters
@@ -66,12 +85,20 @@ export async function getEntry(entryId: string) {
 }
 
 /**
- * Create a new road crack entry
+ * Create a new road crack entry (requires authentication)
  */
 export async function createEntry(formData: FormData) {
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    const headers: HeadersInit = {}
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`
+    }
+    
     const response = await fetch(`${API_URL}/api/entries`, {
       method: 'POST',
+      headers, // Don't set Content-Type for FormData
       body: formData, // FormData will be sent as multipart/form-data
     });
     
@@ -87,15 +114,15 @@ export async function createEntry(formData: FormData) {
 }
 
 /**
- * Update an existing road crack entry
+ * Update an existing road crack entry (requires authentication)
  */
 export async function updateEntry(entryId: string, data: EntryUpdateData) {
   try {
+    const headers = await getAuthHeaders()
+    
     const response = await fetch(`${API_URL}/api/entries/${entryId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(data),
     });
     
@@ -111,12 +138,15 @@ export async function updateEntry(entryId: string, data: EntryUpdateData) {
 }
 
 /**
- * Delete a road crack entry
+ * Delete a road crack entry (requires authentication)
  */
 export async function deleteEntry(entryId: string) {
   try {
+    const headers = await getAuthHeaders()
+    
     const response = await fetch(`${API_URL}/api/entries/${entryId}`, {
       method: 'DELETE',
+      headers,
     });
     
     if (!response.ok) {
@@ -131,11 +161,16 @@ export async function deleteEntry(entryId: string) {
 }
 
 /**
- * Get current user information
+ * Get current user information (requires authentication)
  */
 export async function getCurrentUser() {
   try {
-    const response = await fetch(`${API_URL}/api/users/me`);
+    const headers = await getAuthHeaders()
+    
+    const response = await fetch(`${API_URL}/api/users/me`, {
+      headers,
+    });
+    
     if (!response.ok) {
       throw new Error(`Error fetching user: ${response.statusText}`);
     }

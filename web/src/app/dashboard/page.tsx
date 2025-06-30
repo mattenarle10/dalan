@@ -1,5 +1,6 @@
 'use client'
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
 import Link from "next/link";
@@ -9,11 +10,20 @@ import { useEntries } from "@/lib/swr-hooks";
 
 export default function Dashboard() {
   const { entries = [], isLoading: loading } = useEntries();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Handle URL parameters
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'my') {
+      setViewMode('my');
+    }
+  }, [searchParams]);
   
   // Filter entries based on selected filters
   const filteredEntries = entries.filter((entry: RoadCrackEntry) => {
@@ -254,10 +264,10 @@ export default function Dashboard() {
             <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-2 flex-shrink-0">
-                  {entry.user?.name === 'Matthew Enarle' ? (
+                  {entry.user?.avatar ? (
                     <Image 
-                      src="/placeholders/matt.png" 
-                      alt="Matthew Enarle" 
+                      src={entry.user.avatar} 
+                      alt={entry.user.name || 'User'} 
                       width={32}
                       height={32}
                       className="w-full h-full object-cover"

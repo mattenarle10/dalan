@@ -4,6 +4,7 @@ import "./globals.css";
 import "mapbox-gl/dist/mapbox-gl.css";
 import dynamic from "next/dynamic";
 import { ToastProvider } from "@/components/toast/ToastProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,15 +35,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
-        <ToastProvider>
-          <Navbar />
-          <main className="flex-grow">
-            {children}
-          </main>
-          <div className="hidden sm:block">
-            <Footer />
-          </div>
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <Navbar />
+            <main className="flex-grow">
+              {children}
+            </main>
+            <div className="hidden sm:block">
+              <Footer />
+            </div>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

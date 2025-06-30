@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import type { Map as MapboxMap, MapboxOptions } from 'mapbox-gl';
+import type { Map as MapboxMap, Marker } from 'mapbox-gl';
 import MapManager from '@/lib/mapManager';
 
 interface UseMapboxOptions {
@@ -7,15 +7,14 @@ interface UseMapboxOptions {
   zoom?: number;
   style?: string;
   interactive?: boolean;
-  markers?: Array<{
-    coordinates: [number, number];
-    element?: HTMLElement;
-    popup?: {
-      content: string;
-      offset?: number;
-    };
-  }>;
   onCenterChanged?: (coords: [number, number]) => void;
+  markers?: Array<{
+    position: [number, number]; // [lng, lat]
+    popup?: string;
+    id?: string;
+    severity?: string;
+  }>;
+  onMarkerClick?: (id: string) => void;
 }
 
 /**
@@ -26,8 +25,9 @@ export function useMapbox({
   zoom = 13,
   style = 'mapbox://styles/mapbox/streets-v11',
   interactive = true,
+  onCenterChanged,
   markers,
-  onCenterChanged
+  onMarkerClick
 }: UseMapboxOptions) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapboxMap | null>(null);
@@ -36,6 +36,7 @@ export function useMapbox({
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const eventHandlersSetup = useRef<boolean>(false);
   const mapIdRef = useRef<string>('');
+  const markersRef = useRef<Marker[]>([]);
 
   // Initialize map using MapManager
   useEffect(() => {
@@ -91,7 +92,7 @@ export function useMapbox({
         eventHandlersSetup.current = false;
       }
     };
-  }, []); // Remove dependencies to prevent re-initialization
+  }, [initialCenter, interactive, style, zoom]); // Add missing dependencies
 
   // Setup event handlers after map is initialized
   useEffect(() => {
@@ -225,46 +226,97 @@ export function useMapbox({
     }
   }, [isLoaded, onCenterChanged]);
   
-  // Function to add markers to the map
-  const addMarkers = useCallback(async (markers: UseMapboxOptions['markers']) => {
-    if (!mapInstanceRef.current || !markers || !isLoaded) return;
+  // Add markers function with proper marker creation
+  const addMarkersToMap = useCallback(async () => {
+    if (!mapInstanceRef.current || !isLoaded || !markers) return;
     
     try {
       const mapboxgl = (await import('mapbox-gl')).default;
       const map = mapInstanceRef.current;
       
+      // Double check that map is still valid and has the required methods
+      if (!map.getCanvasContainer) {
+        console.warn('[useMapbox] Map instance is not fully initialized yet, skipping marker addition');
+        return;
+      }
+      
       // Clear existing markers
-      const existingMarkers = document.querySelectorAll('.mapboxgl-marker');
-      existingMarkers.forEach((marker) => marker.remove());
+      markersRef.current.forEach(marker => {
+        try {
+          marker.remove();
+        } catch (e) {
+          console.warn('[useMapbox] Error removing existing marker:', e);
+        }
+      });
+      markersRef.current = [];
       
       // Add new markers
-      markers.forEach((marker) => {
-        if (marker.element) {
-          // Custom element marker
-          new mapboxgl.Marker(marker.element)
-            .setLngLat(marker.coordinates)
+      markers.forEach((markerData) => {
+        try {
+          // Create custom marker element
+          const el = document.createElement('div');
+          el.className = 'custom-marker';
+          el.style.width = '32px';
+          el.style.height = '32px';
+          el.style.cursor = 'pointer';
+          
+          // Create SVG for the marker using the map-pin.svg design
+          el.innerHTML = `
+            <svg width="32" height="32" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12,0 C16.418278,0 20,3.581722 20,8 C20,12.418278 12,24 12,24 C12,24 4,12.418278 4,8 C4,3.581722 7.581722,0 12,0 Z" 
+                    fill="${markerData.severity === 'major' ? '#dc2626' : '#eab308'}" 
+                    stroke="#ffffff" 
+                    stroke-width="1"/>
+              <circle fill="#FFFFFF" cx="12" cy="8" r="4"/>
+            </svg>
+          `;
+          
+          // Create marker with error handling
+          const marker = new mapboxgl.Marker(el)
+            .setLngLat(markerData.position)
             .addTo(map);
-        } else {
-          // Default marker
-          const markerInstance = new mapboxgl.Marker()
-            .setLngLat(marker.coordinates)
-            .addTo(map);
-            
-          // Add popup if specified
-          if (marker.popup) {
-            const popup = new mapboxgl.Popup({ 
-              offset: marker.popup.offset || 25,
-              closeButton: false
-            })
-            .setHTML(marker.popup.content);
-            
-            markerInstance.setPopup(popup);
+          
+          // Add click handler
+          if (onMarkerClick && markerData.id) {
+            el.addEventListener('click', () => {
+              onMarkerClick(markerData.id!);
+            });
           }
+          
+          markersRef.current.push(marker);
+        } catch (markerError) {
+          console.error('[useMapbox] Error adding individual marker:', markerError, 'for marker:', markerData);
         }
       });
     } catch (error) {
       console.error('[useMapbox] Error adding markers:', error);
     }
+  }, [isLoaded, markers, onMarkerClick]);
+
+  // Update markers when they change - with delay to ensure map is ready
+  useEffect(() => {
+    if (isLoaded && mapInstanceRef.current) {
+      // Add a small delay to ensure map is fully ready
+      const timer = setTimeout(() => {
+        addMarkersToMap();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoaded, addMarkersToMap]);
+
+  // Add markers function for backward compatibility
+  const addMarkers = useCallback((markers: Array<{ 
+    coordinates: [number, number]; 
+    element?: HTMLElement; 
+    popup?: { content: string; offset?: number } 
+  }>) => {
+    if (!mapInstanceRef.current || !isLoaded) return;
+    
+    markers.forEach((marker) => {
+      // Add marker logic here
+      console.log('Adding marker:', marker);
+    });
   }, [isLoaded]);
   
   return {

@@ -97,7 +97,7 @@ export default function EditModal({
           
           <button 
             type="submit"
-            className="px-4 py-2 rounded-md bg-dalan-yellow text-black text-sm font-medium hover:opacity-90 transition-opacity"
+            className="px-4 py-2 rounded-md bg-dalan-yellow text-foreground text-sm font-medium hover:opacity-90 transition-opacity"
           >
             {submitText}
           </button>

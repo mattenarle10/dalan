@@ -1,28 +1,38 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { User, LogOut, Calendar, ArrowRight } from "lucide-react";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 export default function ProfilePage() {
-  // Mock user data for UI
-  const user = {
-    name: "John Doe",
-    email: "john.doe@email.com",
-    image: "",
-    memberSince: "2024-01-01",
-    locationsAdded: 0
+  return (
+    <ProtectedRoute>
+      <ProfileContent />
+    </ProtectedRoute>
+  );
+}
+
+function ProfileContent() {
+  const { user, signOut } = useAuthContext();
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Redirect will be handled by auth context/provider
+    } catch (error) {
+      console.error('Sign out error:', error);
+      alert('Failed to sign out. Please try again.');
+    }
   };
 
-  // Simple handler for sign out button
-  const handleSignOut = () => {
-    console.log("Sign out clicked (demo only)");
-    // Redirect to landing page
-    window.location.href = "/";
-  };
-
-
+  // Get user metadata (extract name from email if no display name)
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+  const userEmail = user?.email || '';
+  const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown';
+  const userImage = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || '';
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 pt-22 pb-24 md:pt-24 md:pb-8">
@@ -34,10 +44,10 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center space-y-5">
               {/* Avatar */}
               <div className="h-28 w-28 rounded-full border-2 border-border overflow-hidden bg-muted flex items-center justify-center">
-                {user.image ? (
+                {userImage ? (
                   <Image 
-                    src={user.image} 
-                    alt={user.name}
+                    src={userImage} 
+                    alt={userName}
                     width={112}
                     height={112}
                     className="object-cover"
@@ -50,10 +60,10 @@ export default function ProfilePage() {
               {/* User info */}
               <div className="text-center">
                 <h2 className="text-2xl md:text-3xl font-bold mb-1 text-foreground">
-                  {user.name}
+                  {userName}
                 </h2>
                 <p className="text-md text-muted-foreground mb-2">
-                  {user.email}
+                  {userEmail}
                 </p>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border border-border">
                   Member
@@ -73,7 +83,11 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-sm flex justify-between text-foreground">
                   <span className="text-muted-foreground">Member since:</span> 
-                  <span>{new Date(user.memberSince).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                  <span>{memberSince}</span>
+                </p>
+                <p className="text-sm flex justify-between text-foreground">
+                  <span className="text-muted-foreground">User ID:</span> 
+                  <span className="font-mono text-xs">{user?.id}</span>
                 </p>
               </div>
               
@@ -84,14 +98,14 @@ export default function ProfilePage() {
                     <Calendar size={16} className="mr-2" />
                     <h3 className="font-medium">Activity</h3>
                   </div>
-                  <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline">
+                  <Link href="/dashboard?view=my" className="flex items-center text-sm text-primary hover:underline">
                     View my entries
                     <ArrowRight size={14} className="ml-1" />
                   </Link>
                 </div>
                 <p className="text-sm flex justify-between text-foreground">
-                  <span className="text-muted-foreground">Locations added:</span> 
-                  <span>{user.locationsAdded}</span>
+                  <span className="text-muted-foreground">Authentication provider:</span> 
+                  <span className="capitalize">{user?.app_metadata?.provider || 'email'}</span>
                 </p>
               </div>
             </div>

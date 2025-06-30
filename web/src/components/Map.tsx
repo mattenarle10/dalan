@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { useMapbox } from '@/hooks/useMapbox';
 
@@ -8,17 +8,16 @@ interface MapProps {
   // Mapbox uses [longitude, latitude] format
   initialCenter?: [number, number]; // [lng, lat]
   zoom?: number;
+  interactive?: boolean;
+  centerPin?: boolean; // Whether to show a fixed pin at the center of the map
+  onCenterChanged?: (coordinates: [number, number]) => void; // Called when map center changes (for drag-to-position)
   markers?: Array<{
     position: [number, number]; // [lng, lat]
     popup?: string;
     id?: string;
     severity?: string;
   }>;
-  onMapClick?: (coordinates: [number, number]) => void;
   onMarkerClick?: (id: string) => void;
-  interactive?: boolean;
-  centerPin?: boolean; // Whether to show a fixed pin at the center of the map
-  onCenterChanged?: (coordinates: [number, number]) => void; // Called when map center changes (for drag-to-position)
 }
 
 // Component that loads and displays a Mapbox map
@@ -32,11 +31,10 @@ const Map = forwardRef<{
 }, MapProps>(function Map({ 
   initialCenter = [120.9842, 14.5995], // Default coordinates for Manila
   zoom = 13,
+  interactive = true,
   centerPin = false,
   onCenterChanged,
   markers,
-  interactive = false,
-  onMapClick,
   onMarkerClick,
 }, ref) {
   // Use our custom mapbox hook
@@ -50,7 +48,10 @@ const Map = forwardRef<{
   } = useMapbox({
     initialCenter,
     zoom,
-    onCenterChanged
+    interactive,
+    onCenterChanged,
+    markers,
+    onMarkerClick
   });
 
   // Expose methods via ref
@@ -75,7 +76,7 @@ const Map = forwardRef<{
       
       addMapMarkers(markers);
     }
-  }), [isLoaded, center, setCenter, addMapMarkers]);
+  }), [isLoaded, center, setCenter, addMapMarkers, mapInstance]);
 
   return (
     <div className="relative w-full h-full">

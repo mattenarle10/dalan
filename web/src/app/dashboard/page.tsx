@@ -254,10 +254,10 @@ export default function Dashboard() {
             <div className="p-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <div className="flex items-center">
                 <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mr-2 flex-shrink-0">
-                  {entry.user?.name === 'Matthew Enarle' ? (
+                  {entry.user?.avatar ? (
                     <Image 
-                      src="/placeholders/matt.png" 
-                      alt="Matthew Enarle" 
+                      src={entry.user.avatar} 
+                      alt={entry.user.name || 'User'} 
                       width={32}
                       height={32}
                       className="w-full h-full object-cover"

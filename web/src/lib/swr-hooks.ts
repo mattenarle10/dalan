@@ -1,16 +1,42 @@
 import useSWR, { mutate as globalMutate } from 'swr';
 import { updateEntry, deleteEntry } from './api';
 import { EntryUpdateData } from './interface';
+import { supabase } from './supabase';
 
-// Generic fetcher function for SWR
+// Generic fetcher function for SWR with auth headers
 const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  // Get current session for auth headers
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Add auth header if user is authenticated
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+  
+  const res = await fetch(url, { headers });
   
   if (!res.ok) {
     throw new Error(`Error: ${res.status} ${res.statusText}`);
   }
   
-  return res.json();
+  const data = await res.json();
+  
+  // If user is authenticated, mark their entries
+  if (session?.user?.id && Array.isArray(data)) {
+    return data.map((entry: any) => ({
+      ...entry,
+      user: {
+        ...entry.user,
+        isCurrentUser: entry.user?.id === session.user.id
+      }
+    }));
+  }
+  
+  return data;
 };
 
 // Hook for fetching all entries
@@ -39,6 +65,17 @@ export function useEntries() {
   };
 }
 
+// Simple fetcher without auth for single entries (public endpoint)
+const simpleFetcher = async (url: string) => {
+  const res = await fetch(url);
+  
+  if (!res.ok) {
+    throw new Error(`Error: ${res.status} ${res.statusText}`);
+  }
+  
+  return res.json();
+};
+
 // Hook for fetching a single entry by ID
 export function useEntry(id: string) {
   const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -49,7 +86,7 @@ export function useEntry(id: string) {
   
   const { data, error, isLoading, mutate } = useSWR(
     id ? `${API_URL}/api/entries/${id}` : null, // Only fetch when ID is available
-    fetcher,
+    simpleFetcher,
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,

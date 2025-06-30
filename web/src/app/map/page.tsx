@@ -23,6 +23,7 @@ interface RoadCrackEntry {
     id: string
     name: string
     isCurrentUser: boolean
+    avatar?: string
   }
   detection_info?: {
     total_cracks: number
@@ -403,9 +404,21 @@ function MapContent() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center text-xs">
                   <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mr-1.5 overflow-hidden">
-                    <User size={12} />
+                    {selectedEntry.user?.avatar ? (
+                      <Image 
+                        src={selectedEntry.user.avatar} 
+                        alt={selectedEntry.user.name || 'User'} 
+                        width={20}
+                        height={20}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {selectedEntry.user?.name?.charAt(0) || '?'}
+                      </div>
+                    )}
                   </div>
-                  <span>{selectedEntry.user.name}</span>
+                  <span>{selectedEntry.user?.name || 'Unknown User'}</span>
                 </div>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-card border border-gray-200 dark:border-gray-700">
                   {selectedEntry.type}

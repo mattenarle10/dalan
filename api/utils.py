@@ -104,6 +104,7 @@ def format_entry_response(entry, user):
             "user": {
                 "id": user["id"],
                 "name": user["name"],
+                "avatar": user.get("avatar_url"),
                 "isCurrentUser": False  # This would be set by the frontend
             }
         }

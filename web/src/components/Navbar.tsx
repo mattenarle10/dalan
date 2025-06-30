@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Sun, Moon, UserCircle } from 'lucide-react'
+import { Sun, Moon, UserCircle, LogIn } from 'lucide-react'
 import { LocationPlus, Grid, Map } from '@mynaui/icons-react'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 export default function Navbar() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const { user, loading } = useAuthContext()
   
   // Toggle theme function
   const toggleTheme = () => {
@@ -30,6 +32,11 @@ export default function Navbar() {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Determine auth link and label
+  const authLink = !loading && user ? '/profile' : '/auth'
+  const authLabel = !loading && user ? 'Profile' : 'Login'
+  const AuthIcon = !loading && user ? UserCircle : LogIn
 
   return (
     <>
@@ -78,9 +85,9 @@ export default function Navbar() {
               <Map size={22} className="text-foreground mb-0.5" />
               <span className="text-xs font-medium">Map</span>
             </Link>
-            <Link href="/auth" className="flex flex-col items-center p-1 rounded-lg hover:bg-muted/60 transition-colors">
-              <UserCircle size={22} className="text-foreground mb-0.5" />
-              <span className="text-xs font-medium">{mounted ? 'Profile' : 'Account'}</span>
+            <Link href={authLink} className="flex flex-col items-center p-1 rounded-lg hover:bg-muted/60 transition-colors">
+              <AuthIcon size={22} className="text-foreground mb-0.5" />
+              <span className="text-xs font-medium">{mounted ? authLabel : 'Account'}</span>
             </Link>
           </div>
         </div>
@@ -121,11 +128,11 @@ export default function Navbar() {
                 <span>Map</span>
               </Link>
               <Link 
-                href="/auth" 
+                href={authLink} 
                 className="flex items-center px-3 py-2 rounded-md hover:bg-muted/60 transition-colors text-sm font-medium"
               >
-                <UserCircle size={18} className="text-foreground mr-1.5" />
-                <span>{mounted ? 'Profile' : 'Account'}</span>
+                <AuthIcon size={18} className="text-foreground mr-1.5" />
+                <span>{mounted ? authLabel : 'Account'}</span>
               </Link>
             </div>
             

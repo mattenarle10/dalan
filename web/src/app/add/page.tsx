@@ -7,6 +7,8 @@ import Image from 'next/image'
 import SuccessModal from '@/components/modal/SuccessModal'
 import { createEntry } from '@/lib/api'
 import { RoadCrackEntry } from '@/lib/interface'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuthContext } from '@/contexts/AuthContext'
 
 // Dynamically import Map component to avoid SSR issues
 const Map = dynamic(() => import('@/components/Map'), { 
@@ -181,9 +183,16 @@ const MapContainer = memo(forwardRef<
   return !coordsChanged;
 });
 
-// No longer using memo comparison function as it was causing issues with position updates
-
 export default function AddEntryPage() {
+  return (
+    <ProtectedRoute>
+      <AddEntryContent />
+    </ProtectedRoute>
+  )
+}
+
+function AddEntryContent() {
+  const { user } = useAuthContext()
   
   // Form state
   const [title, setTitle] = useState('')
@@ -198,319 +207,220 @@ export default function AddEntryPage() {
   const mapControlRef = useRef<{
     centerMap: (coords: [number, number]) => void;
   }>({
-    centerMap: () => {}
+    centerMap: () => {} // fallback function
   });
   
-  const [severity, setSeverity] = useState<'minor' | 'major'>('minor')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  
-  // State for location search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Array<{ place_name: string; center: [number, number] }>>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false);
-  
-  // Ref for map container to scroll to it when needed
-  const mapContainer = useRef<HTMLDivElement>(null);
-  
-  // Multi-step form state
+  // Step state
   const [currentStep, setCurrentStep] = useState(1)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string>('')
+  const [severity, setSeverity] = useState<'minor' | 'major'>('minor')
+  
+  // Upload state
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [isSuccess, setIsSuccess] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [submittedEntry, setSubmittedEntry] = useState<RoadCrackEntry | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
   
-  // New state for dragging pin
-  const [isDraggingPin, setIsDraggingPin] = useState(false);
+  // Location search state  
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Array<{place_name: string, center: [number, number]}>>([])
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false)
+  const [isDraggingPin, setIsDraggingPin] = useState(false)
+  const [showLocationFeedback, setShowLocationFeedback] = useState(false)
   
-  // Create a ref to store the last drag timestamp
-  const lastDragTimestampRef = useRef(0);
+  const mapContainer = useRef<HTMLDivElement | null>(null)
   
-  const [showLocationFeedback, setShowLocationFeedback] = useState(false);
-  
-  // Function to handle map center changed (when user drags the map)
-  const handleMapCenterChanged = useCallback((coords: [number, number]) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AddEntryPage] handleMapCenterChanged called with coords:', coords);
-    }
-    
-    // Create a fresh copy of coordinates to ensure React state updates
-    const freshCoords: [number, number] = [coords[0], coords[1]];
-    const lng = freshCoords[0];
-    const lat = freshCoords[1];
-    
-    // Update ref immediately to maintain consistency
-    coordsRef.current = freshCoords;
-    
-    // Set dragging pin state to true to highlight coordinates
-    setIsDraggingPin(true);
-    
-    // Update coordinates state with functional update to prevent race conditions
-    // Use requestAnimationFrame to batch updates and avoid excessive re-renders
-    requestAnimationFrame(() => {
-      setCoordinates(prevCoords => {
-        // Only update if coordinates have changed significantly
-        if (
-          Math.abs(prevCoords[0] - freshCoords[0]) < 0.000001 && 
-          Math.abs(prevCoords[1] - freshCoords[1]) < 0.000001
-        ) {
-          return prevCoords;
-        }
-        return freshCoords;
-      });
-      
-      // Immediately set a temporary location name for better responsiveness
-      const tempLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      setLocation(tempLocation);
-    });
-    
-    // Store the last drag timestamp to prevent race conditions
-    const dragTimestamp = Date.now();
-    lastDragTimestampRef.current = dragTimestamp;
-    
-    // Show loading state
-    setIsSearching(true);
-    
-    // Clear any existing timeout
-    const timeoutId = setTimeout(() => {
-      // Only proceed if this is still the most recent drag event
-      if (dragTimestamp !== lastDragTimestampRef.current) {
+  // Handle map center changes - useCallback to prevent unnecessary re-renders
+  const handleMapCenterChanged = useCallback(
+    (coords: [number, number]) => {
+      // Skip update if coordinates haven't changed significantly 
+      if (Math.abs(coordsRef.current[0] - coords[0]) < 0.000001 && 
+          Math.abs(coordsRef.current[1] - coords[1]) < 0.000001) {
         return;
       }
       
-      // Reset dragging pin state after debounce
-      setIsDraggingPin(false);
+      // Update the ref first for future comparisons
+      coordsRef.current = coords;
       
-      // Reverse geocode to get location name
+      // Update the component state to trigger re-render
+      setCoordinates([...coords]);
+      
+      // Clear any location query when user moves the map
+      setSearchQuery('');
+      setShowSearchResults(false);
+      
+      // Show brief visual feedback for position change
+      setShowLocationFeedback(true);
+      
+      // Start reverse geocoding to get address
       const reverseGeocode = async () => {
         try {
-          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${mapboxToken}&limit=1`
-          );
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${coords[0]},${coords[1]}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&types=address,poi&limit=1`;
+          const response = await fetch(url);
           
-          if (response.ok) {
-            const data = await response.json();
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[AddEntryPage] Geocoding data:', data);
-            }
-            
-            // Ensure we're still looking at the same coordinates
-            if (coordsRef.current[0] !== lng || coordsRef.current[1] !== lat) {
-              console.log('[AddEntryPage] Coordinates changed during geocoding, discarding result');
-              return;
-            }
-            
-            if (data.features && data.features.length > 0) {
-              // Get the most relevant place name
-              const placeName = data.features[0].place_name;
-              // Only update the location name, NOT the coordinates
-              setLocation(placeName);
-            } else {
-              // For locations with no features (like oceans), use coordinates with indicator
-              const waterLocation = `Water location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-              setLocation(waterLocation);
-            }
-          } else {
-            throw new Error('Failed to fetch location data');
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.features && data.features.length > 0) {
+            const address = data.features[0].place_name;
+            setLocation(address);
           }
         } catch (error) {
-          console.error('[AddEntryPage] Error in reverse geocoding:', error);
-          // Fallback to showing coordinates
-          const fallbackLocation = `Location at ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-          setLocation(fallbackLocation);
-        } finally {
-          // Hide loading state
-          setIsSearching(false);
+          console.error('Reverse geocoding failed:', error);
+          // Fallback: use coordinates as location string
+          setLocation(`${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}`);
         }
       };
       
-      // Execute the reverse geocoding
-      reverseGeocode();
-    }, 300);
-    
-    // Return cleanup function to clear timeout if component unmounts or function is called again
-    return () => clearTimeout(timeoutId);
-  }, []);
-
-  // Handle file selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setSelectedFile(file)
+      // Debounce the reverse geocoding API call
+      const timeoutId = setTimeout(() => {
+        reverseGeocode();
+        setShowLocationFeedback(false);
+      }, 500);
       
-      // Create a preview URL
-      const reader = new FileReader()
-      reader.onload = () => {
-        setPreviewUrl(reader.result as string)
+      // Clean up previous timeout
+      return () => clearTimeout(timeoutId);
+    },
+    []
+  );
+
+  // Set initial location on component mount
+  useEffect(() => {
+    if (location === '') {
+      // Initial reverse geocoding
+      handleMapCenterChanged(coordinates);
+    }
+  }, []); // Only run once on mount
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB')
+        return
       }
-      reader.readAsDataURL(file)
+      
+      setSelectedFile(file)
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
     }
   }
 
-  // Function to search for locations using Mapbox Geocoding API
   const searchLocation = async (query: string) => {
     if (!query.trim()) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
+      setShowSearchResults(false)
+      return
     }
-    
-    setIsSearching(true);
-    setShowSearchResults(true);
-    
+
+    setIsSearching(true)
     try {
-      const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&limit=5`
-      );
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&country=PH&types=place,locality,neighborhood,address,poi&limit=5`
+      const response = await fetch(url)
       
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.features || []);
-        
-        // Don't auto-select the first result - wait for user to explicitly select a result
-        // Only show the search results for the user to choose from
-      } else {
-        console.error('Error searching for location:', response.statusText);
-        setSearchResults([]);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      if (data.features) {
+        const results = data.features.map((feature: any) => ({
+          place_name: feature.place_name,
+          center: feature.center
+        }))
+        setSearchResults(results)
+        setShowSearchResults(results.length > 0)
       }
     } catch (error) {
-      console.error('Error searching for location:', error);
-      setSearchResults([]);
+      console.error('Search failed:', error)
+      setSearchResults([])
+      setShowSearchResults(false)
     } finally {
-      setIsSearching(false);
+      setIsSearching(false)
     }
-  };
+  }
 
-  // Debounce search to avoid too many API calls
+  // Debounce search function
   useEffect(() => {
-    const timer = setTimeout(() => {
-      searchLocation(searchQuery);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-  
-  // Function to select a location from search results
-  const handleSelectSearchResult = (result: {place_name: string, center: [number, number]}) => {
-    // Update location state with the selected place name
-    setLocation(result.place_name);
-    
-    // Update coordsRef first for consistency
-    coordsRef.current = [...result.center];
-    
-    // Update coordinates with the selected location's coordinates
-    setCoordinates([...result.center]);
-    
-    // Directly center the map for immediate visual feedback
-    mapControlRef.current.centerMap(result.center);
-    
-    // Clear search results and query
-    setSearchResults([]);
-    setShowSearchResults(false);
-    setSearchQuery('');
-    
-    // Scroll to map if needed
-    if (mapContainer.current) {
-      mapContainer.current.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Show feedback animation
-    setShowLocationFeedback(true);
-    setTimeout(() => {
-      setShowLocationFeedback(false);
-    }, 500);
-    
-    // Update current step to 2 (location selection)
-    setCurrentStep(2);
-  };
+    const timeoutId = setTimeout(() => searchLocation(searchQuery), 300)
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
 
-  // Function to get current location
+  const handleSelectSearchResult = (result: {place_name: string, center: [number, number]}) => {
+    const newCoords: [number, number] = [result.center[0], result.center[1]]
+    
+    // Update coordinates
+    setCoordinates(newCoords)
+    
+    // Update refs to prevent conflicts
+    coordsRef.current = newCoords
+    
+    // Set location to the selected place name
+    setLocation(result.place_name)
+    
+    // Clear search
+    setSearchQuery('')
+    setShowSearchResults(false)
+    
+    // Programmatically center the map
+    if (mapControlRef.current) {
+      mapControlRef.current.centerMap(newCoords)
+    }
+  }
+
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
-      return;
+      alert('Geolocation is not supported by this browser.')
+      return
     }
-    
-    setIsGettingCurrentLocation(true);
+
+    setIsGettingCurrentLocation(true)
     
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { longitude, latitude } = position.coords;
-        const newCoordinates: [number, number] = [longitude, latitude];
+      (position) => {
+        const newCoords: [number, number] = [position.coords.longitude, position.coords.latitude]
         
-        // Update coordsRef first to maintain consistency
-        coordsRef.current = [...newCoordinates];
+        // Update coordinates
+        setCoordinates(newCoords)
         
-        // Force a state update with a new array to ensure React detects the change
-        setCoordinates([...newCoordinates]);
+        // Update refs
+        coordsRef.current = newCoords
         
-        // Directly center the map for immediate visual feedback
-        mapControlRef.current.centerMap(newCoordinates);
-        
-        // Scroll to map if needed
-        if (mapContainer.current) {
-          mapContainer.current.scrollIntoView({ behavior: 'smooth' });
+        // Programmatically center the map
+        if (mapControlRef.current) {
+          mapControlRef.current.centerMap(newCoords)
         }
         
-        // Show feedback animation
-        setShowLocationFeedback(true);
-        setTimeout(() => {
-          setShowLocationFeedback(false);
-        }, 500);
+        // The reverse geocoding will happen in handleMapCenterChanged
         
-        // Temporary location name for better responsiveness
-        const tempLocation = `Location at ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-        setLocation(tempLocation);
-        
-        // Reverse geocode to get location name
-        try {
-          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-          const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}&limit=1`
-          );
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.features && data.features.length > 0) {
-              // Only update if we're still looking at the same coordinates
-              if (coordsRef.current[0] === longitude && coordsRef.current[1] === latitude) {
-                setLocation(data.features[0].place_name);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error reverse geocoding:', error);
-        } finally {
-          setIsGettingCurrentLocation(false);
-        }
+        setIsGettingCurrentLocation(false)
       },
       (error) => {
-        console.error('Error getting current location:', error);
-        alert('Unable to retrieve your location. Please ensure location services are enabled.');
-        setIsGettingCurrentLocation(false);
+        console.error('Geolocation error:', error)
+        alert('Unable to get your current location. Please search for a location instead.')
+        setIsGettingCurrentLocation(false)
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  };
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 600000
+      }
+    )
+  }
 
-  // Navigate between steps
   const goToNextStep = () => {
     if (currentStep < 3) {
-      const nextStep = currentStep + 1;
-      setCurrentStep(nextStep);
-      
-      // Auto-detect location when entering step 2
-      if (nextStep === 2 && navigator.geolocation) {
-        // Automatically get user's current location
-        getCurrentLocation();
-      }
+      setCurrentStep(currentStep + 1)
     }
-  };
+  }
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
@@ -518,30 +428,33 @@ export default function AddEntryPage() {
     }
   }
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
     
-    if (!selectedFile) {
-      alert('Please select an image');
-      return;
+    if (!user) {
+      alert('You must be logged in to submit an entry')
+      return
     }
     
-    setIsSubmitting(true);
-    setShowSuccessModal(true); // Show modal immediately in loading state
+    if (!selectedFile) {
+      alert('Please select an image')
+      return
+    }
+    
+    setIsSubmitting(true)
+    setUploadProgress(0)
+    setShowSuccessModal(true)
     
     try {
-      // Create FormData object
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('location', location);
+      const formData = new FormData()
+      formData.append('title', title)
+      formData.append('description', description)
+      formData.append('location', location)
       formData.append('coordinates', JSON.stringify(coordinates));
       formData.append('severity', severity);
       formData.append('image', selectedFile);
-      // Add user_id - using a default value if not available
-      formData.append('user_id', '00472f53-73a0-4912-a79b-68407e5998e3'); // Use the actual user ID from database
+      // Use authenticated user ID instead of hardcoded value
+      formData.append('user_id', user.id);
       
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -572,7 +485,7 @@ export default function AddEntryPage() {
       setTitle('');
       setDescription('');
       setSelectedFile(null);
-      setPreviewUrl(null);
+      setPreviewUrl('');
       setCurrentStep(1);
       
     } catch (error) {
@@ -737,87 +650,71 @@ export default function AddEntryPage() {
         {currentStep === 2 && (
           <div className="space-y-4 animate-fadeIn" ref={mapContainer}>
             {/* Search box with integrated location button */}
-            <div className="mb-4">
-              <label htmlFor="search-location" className="block text-sm font-medium mb-2 text-foreground">Search Location</label>
-              <div className="relative w-full">
-                <div className="relative w-full bg-background text-foreground rounded-md border border-border shadow-sm focus-within:ring-1 focus-within:ring-foreground focus-within:border-foreground transition-all">
-                  <div className="flex items-center p-3">
-                    <MapPin className="text-foreground" size={18} />
-                    <input
-                      id="search-location"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => setShowSearchResults(true)}
-                      className="flex-1 px-3 py-1 bg-background border-none focus:ring-0 focus:outline-none text-foreground placeholder:text-muted-foreground"
-                      placeholder="Search for a location..."
-                      aria-expanded={showSearchResults}
-                      aria-autocomplete="list"
-                      aria-controls="search-results"
-                      role="combobox"
-                    />
-                    {searchQuery && (
-                      <button 
-                        onClick={() => {
-                          setSearchQuery('');
-                          setShowSearchResults(false);
-                        }}
-                        className="p-1 rounded-full hover:bg-muted transition-colors mr-2"
-                        aria-label="Clear search"
+            <div className="relative">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search for a location..."
+                    className="w-full px-4 py-2 pr-20 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    autoComplete="off"
+                    aria-label="Search for a location"
+                    aria-describedby="search-results"
+                  />
+                  {isSearching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader size={16} className="animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={getCurrentLocation}
+                    disabled={isGettingCurrentLocation}
+                    className="flex items-center justify-center w-10 h-10 border border-border rounded-lg bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Use my current location"
+                    aria-label="Use my current location"
+                  >
+                    {isGettingCurrentLocation ? (
+                      <Loader size={16} className="animate-spin" />
+                    ) : (
+                      <Navigation size={16} />
+                    )}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Search results dropdown */}
+              {showSearchResults && searchResults.length > 0 && (
+                <div 
+                  id="search-results"
+                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-11/12 max-w-md bg-background text-foreground shadow-lg rounded-lg border border-border z-50 overflow-hidden"
+                  style={{ backgroundColor: 'var(--background)' }}
+                  role="listbox"
+                >
+                  <div className="max-h-60 overflow-auto">
+                    {searchResults.map((result, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none transition-colors flex items-start border-b border-border last:border-b-0"
+                        onClick={() => handleSelectSearchResult(result)}
+                        role="option"
+                        aria-selected={false}
                       >
-                        <X size={16} className="text-foreground" />
+                        <MapPin className="mr-3 flex-shrink-0 text-foreground mt-1" size={16} />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">{result.place_name.split(',')[0]}</span>
+                          <span className="text-xs text-muted-foreground mt-0.5">{result.place_name}</span>
+                        </div>
                       </button>
-                    )}
-                    {isSearching && (
-                      <Loader className="mr-2 animate-spin text-foreground" size={16} />
-                    )}
-                    {/* Compact location button */}
-                    <button 
-                      type="button" 
-                      onClick={getCurrentLocation}
-                      disabled={isGettingCurrentLocation}
-                      className="p-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50 transition-all ml-2"
-                      title="Use my current location"
-                      aria-label="Use my current location"
-                    >
-                      {isGettingCurrentLocation ? (
-                        <Loader size={16} className="animate-spin" />
-                      ) : (
-                        <Navigation size={16} />
-                      )}
-                    </button>
+                    ))}
                   </div>
                 </div>
-                
-                {/* Search results dropdown */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div 
-                    id="search-results"
-                    className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-11/12 max-w-md bg-background text-foreground shadow-lg rounded-lg border border-border z-50 overflow-hidden"
-                    style={{ backgroundColor: 'var(--background)' }}
-                    role="listbox"
-                  >
-                    <div className="max-h-60 overflow-auto">
-                      {searchResults.map((result, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          className="w-full text-left px-4 py-3 hover:bg-muted focus:bg-muted focus:outline-none transition-colors flex items-start border-b border-border last:border-b-0"
-                          onClick={() => handleSelectSearchResult(result)}
-                          role="option"
-                          aria-selected={false}
-                        >
-                          <MapPin className="mr-3 flex-shrink-0 text-foreground mt-1" size={16} />
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground">{result.place_name.split(',')[0]}</span>
-                            <span className="text-xs text-muted-foreground mt-0.5">{result.place_name}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
             
             {/* Map */}

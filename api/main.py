@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from models import RoadCrackCreate, RoadCrackResponse, RoadCrackUpdate, User
 import database as db
 from utils import classify_crack_image, save_image, format_entry_response
+from jwt import InvalidAudienceError
 
 # Load environment variables
 load_dotenv()
@@ -82,7 +83,7 @@ def verify_supabase_token(token: str) -> dict:
     Verify Supabase JWT token and extract user info
     
     Args:
-        token (str): JWT token from     Authorization header
+        token (str): JWT token from Authorization header
         
     Returns:
         dict: User info from token payload
@@ -99,12 +100,23 @@ def verify_supabase_token(token: str) -> dict:
             logger.warning("SUPABASE_JWT_SECRET not set, skipping JWT verification (DEV MODE)")
             return {"sub": "ec74d8c5-a458-4191-9464-bdf90a8932bc", "email": "enarlem10@gmail.com"}
         
-        # Verify and decode the JWT token
-        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        # Verify and decode the JWT token with proper options for Supabase
+        payload = jwt.decode(
+            token, 
+            jwt_secret, 
+            algorithms=["HS256"],
+            options={
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_aud": False  # Disable audience verification for Supabase tokens
+            }
+        )
         return payload
         
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
+    except InvalidAudienceError:
+        raise HTTPException(status_code=401, detail="Invalid token audience")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -121,11 +133,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     token = credentials.credentials
     payload = verify_supabase_token(token)
     
-    # Extract user info from JWT payload
+    # Extract comprehensive user info from JWT payload
+    user_metadata = payload.get("user_metadata", {})
+    
     user_info = {
         "id": payload["sub"],  # Supabase user ID
         "email": payload.get("email"),
-        "name": payload.get("user_metadata", {}).get("name", payload.get("email", "").split("@")[0])
+        "name": (user_metadata.get("full_name") or 
+                user_metadata.get("name") or 
+                payload.get("email", "").split("@")[0]),
+        "avatar_url": (user_metadata.get("avatar_url") or 
+                      user_metadata.get("picture")),
+        "created_at": payload.get("created_at")  # Can be added if needed
     }
     
     return user_info

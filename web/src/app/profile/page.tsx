@@ -98,7 +98,7 @@ function ProfileContent() {
                     <Calendar size={16} className="mr-2" />
                     <h3 className="font-medium">Activity</h3>
                   </div>
-                  <Link href="/dashboard" className="flex items-center text-sm text-primary hover:underline">
+                  <Link href="/dashboard?view=my" className="flex items-center text-sm text-primary hover:underline">
                     View my entries
                     <ArrowRight size={14} className="ml-1" />
                   </Link>

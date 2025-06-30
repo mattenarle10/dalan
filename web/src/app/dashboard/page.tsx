@@ -1,5 +1,6 @@
 'use client'
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
 import Link from "next/link";
@@ -9,11 +10,20 @@ import { useEntries } from "@/lib/swr-hooks";
 
 export default function Dashboard() {
   const { entries = [], isLoading: loading } = useEntries();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Handle URL parameters
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'my') {
+      setViewMode('my');
+    }
+  }, [searchParams]);
   
   // Filter entries based on selected filters
   const filteredEntries = entries.filter((entry: RoadCrackEntry) => {

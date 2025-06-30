@@ -1,14 +1,5 @@
 -- Dalan API Database Schema for Supabase
 
--- Users Table
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- Road Cracks Table
 CREATE TABLE IF NOT EXISTS road_cracks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -20,7 +11,7 @@ CREATE TABLE IF NOT EXISTS road_cracks (
     type TEXT NOT NULL, -- Determined by AI classification
     image_url TEXT NOT NULL,
     classified_image_url TEXT,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

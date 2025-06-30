@@ -1,5 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional
 import json
 from datetime import datetime
@@ -16,6 +17,7 @@ import uuid
 import base64
 import aiohttp
 import uvicorn 
+import jwt
 from dotenv import load_dotenv
 from models import RoadCrackCreate, RoadCrackResponse, RoadCrackUpdate, User
 import database as db
@@ -34,7 +36,21 @@ logger.info(f"Loading YOLO model from: {model_path}")
 
 # Try to load YOLO model
 try:
+    # Patch torch.load to use weights_only=False for loading YOLO model
+    import torch
+    original_load = torch.load
+    
+    def patched_load(*args, **kwargs):
+        kwargs['weights_only'] = False
+        return original_load(*args, **kwargs)
+    
+    torch.load = patched_load
+    
     model = YOLO(model_path)
+    
+    # Restore original torch.load
+    torch.load = original_load
+    
     USE_YOLO = True
     logger.info("YOLO model loaded successfully")
 except Exception as e:
@@ -57,6 +73,62 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Auth middleware
+security = HTTPBearer()
+
+def verify_supabase_token(token: str) -> dict:
+    """
+    Verify Supabase JWT token and extract user info
+    
+    Args:
+        token (str): JWT token from     Authorization header
+        
+    Returns:
+        dict: User info from token payload
+        
+    Raises:
+        HTTPException: If token is invalid
+    """
+    try:
+        # Supabase JWT secret (from your Supabase dashboard)
+        jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
+        if not jwt_secret:
+            # For development, we can skip JWT verification
+            # In production, you MUST set SUPABASE_JWT_SECRET
+            logger.warning("SUPABASE_JWT_SECRET not set, skipping JWT verification (DEV MODE)")
+            return {"sub": "ec74d8c5-a458-4191-9464-bdf90a8932bc", "email": "enarlem10@gmail.com"}
+        
+        # Verify and decode the JWT token
+        payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
+        return payload
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """
+    FastAPI dependency to get current authenticated user
+    
+    Args:
+        credentials: Bearer token from Authorization header
+        
+    Returns:
+        dict: Current user info
+    """
+    token = credentials.credentials
+    payload = verify_supabase_token(token)
+    
+    # Extract user info from JWT payload
+    user_info = {
+        "id": payload["sub"],  # Supabase user ID
+        "email": payload.get("email"),
+        "name": payload.get("user_metadata", {}).get("name", payload.get("email", "").split("@")[0])
+    }
+    
+    return user_info
 
 @app.get("/")
 def read_root():
@@ -155,24 +227,12 @@ def get_entry(entry_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 async def classify_image(image: str, user_id: str = None):
-    # """
-    # Classify a road crack image
-    
-    # - **image**: Image file to classify
-    # """
-    # try:
-    #     image_data = await image.read()
-    #     crack_type = classify_crack_image(image_data)
-    #     return {"type": crack_type, "confidence": 0.92}  # Mock confidence score
-    # except Exception as e:
-    #     logger.error(f"Error in classify_image: {e}")
-    #     raise HTTPException(status_code=500, detail=str(e))
     # Download image from URL
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(image) as resp:
                 if resp.status != 200:
-                    return JSONResponse(content={"error": "Failed to download image"}, status_code=400)
+                    raise HTTPException(status_code=400, detail="Failed to download image")
                 img_bytes = await resp.read()
 
         # Convert image bytes to OpenCV format
@@ -180,7 +240,7 @@ async def classify_image(image: str, user_id: str = None):
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
 
         if img is None:
-            return JSONResponse(content={"error": "Invalid image format"}, status_code=400)
+            raise HTTPException(status_code=400, detail="Invalid image format")
 
         # Save image temporarily
         tmp_filename = f"temp_{uuid.uuid4().hex}.jpg"
@@ -244,7 +304,8 @@ async def classify_image(image: str, user_id: str = None):
         return detection_summary
 
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logger.error(f"Error in classify_image: {e}")
+        raise HTTPException(status_code=500, detail=f"Image classification failed: {str(e)}")
 
 @app.post("/api/entries")
 async def create_entry(
@@ -253,8 +314,8 @@ async def create_entry(
     location: str = Form(...),
     coordinates: str = Form(...),  # JSON string [lng, lat]
     severity: str = Form(...),
-    user_id: str = Form(...),
-    image: UploadFile = File(...)
+    image: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Create a new road crack entry
@@ -264,10 +325,14 @@ async def create_entry(
     - **location**: Location name
     - **coordinates**: JSON string of [longitude, latitude]
     - **severity**: Either "minor" or "major"
-    - **user_id**: ID of the user creating the entry
     - **image**: Image file of the road crack
+    
+    Requires: Authorization header with Bearer token
     """
     try:
+        # Get user_id from authenticated user
+        user_id = current_user["id"]
+        
         # Process the image
         image_data = await image.read()
         
@@ -310,7 +375,7 @@ async def create_entry(
             "type": primary_crack_type,  # Use the primary crack type from detection
             "image_url": image_url,
             "classified_image_url": classified_image_url,
-            "user_id": user_id,  # This should be a UUID in the database
+            "user_id": user_id,  # From authenticated user
             "created_at": datetime.now().isoformat()
         }
         
@@ -340,12 +405,8 @@ async def create_entry(
         }
         db.create_detection_summary(summary_data)
         
-        # Get user info
-        user = db.get_user(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        formatted_entry = format_entry_response(new_entry, user)
+        # Use current_user data instead of db lookup
+        formatted_entry = format_entry_response(new_entry, current_user)
         if not formatted_entry:
             raise HTTPException(status_code=500, detail="Error formatting entry")
         
@@ -431,14 +492,9 @@ def delete_entry(entry_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/users/me")
-def get_current_user():
-    """Get current user (mock implementation)"""
-    # In a real app, this would use authentication
-    return {
-        "id": "user1",
-        "name": "Matthew Enarle",
-        "email": "matthew@example.com"
-    }
+def get_current_user_endpoint(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user"""
+    return current_user
 
 # Run the application if executed directly
 if __name__ == "__main__":

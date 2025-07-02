@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
           
           if (accessToken) {
             // Set the session manually if we got tokens from URL
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+            const { error: sessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken || ''
             })

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { Filter, X, MapPin, Calendar, AlertTriangle, ChevronRight, User, Search, Loader2 } from "lucide-react";
+import { Filter, X, MapPin, Calendar, AlertTriangle, ChevronRight, Search, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEntries } from "@/lib/swr-hooks";

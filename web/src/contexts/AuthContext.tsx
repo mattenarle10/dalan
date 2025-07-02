@@ -2,16 +2,16 @@
 
 import { createContext, useContext, ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { User, Session } from '@supabase/supabase-js'
+import { User, Session, AuthError } from '@supabase/supabase-js'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  signUp: (email: string, password: string, name: string) => Promise<any>
-  signIn: (email: string, password: string) => Promise<any>
-  signInWithGoogle: () => Promise<any>
-  signOut: () => Promise<any>
+  signUp: (email: string, password: string, name: string) => Promise<{ data: { user: User | null; session: Session | null; } | { user: null; session: null; }; error: AuthError | null; }>
+  signIn: (email: string, password: string) => Promise<{ data: { user: User; session: Session; } | { user: null; session: null; }; error: AuthError | null; }>
+  signInWithGoogle: () => Promise<{ data: { provider: string; url: string; } | { provider: string; url: null; }; error: AuthError | null; }>
+  signOut: () => Promise<{ error: AuthError | null }>
   isAuthenticated: boolean
 }
 

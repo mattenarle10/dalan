@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, User, Eye, EyeOff, Loader } from 'lucide-react'
 import { useAuthContext } from '@/contexts/AuthContext'
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, signUp, signIn, signInWithGoogle, loading } = useAuthContext()
@@ -83,8 +83,9 @@ export default function AuthPage() {
           alert('Check your email for verification link!')
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'An error occurred')
     } finally {
       setIsSubmitting(false)
     }
@@ -103,8 +104,9 @@ export default function AuthPage() {
         }
       }
       // Redirect will be handled by the auth provider
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google')
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Failed to sign in with Google')
     }
   }
 
@@ -350,5 +352,20 @@ export default function AuthPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-3">
+          <Loader className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AuthContent />
+    </Suspense>
   )
 }

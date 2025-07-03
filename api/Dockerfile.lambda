@@ -1,0 +1,21 @@
+FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.9
+
+# Copy requirements and install dependencies
+COPY requirements.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install -r requirements.txt
+
+# Copy application code
+COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/
+COPY main.py ${LAMBDA_TASK_ROOT}/
+COPY database.py ${LAMBDA_TASK_ROOT}/
+COPY models.py ${LAMBDA_TASK_ROOT}/
+COPY utils.py ${LAMBDA_TASK_ROOT}/
+COPY s3_model_loader.py ${LAMBDA_TASK_ROOT}/
+
+# Set environment variables
+ENV MODEL_S3_BUCKET=dalan-yolo-models
+ENV MODEL_S3_KEY=models/YOLOv8_Small_RDD.pt
+ENV ENVIRONMENT=production
+
+# Set the CMD to your handler
+CMD ["lambda_handler.lambda_handler"] 

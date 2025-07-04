@@ -1,8 +1,20 @@
 FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.9
 
+# Install system dependencies for OpenCV
+RUN yum update -y && \
+    yum install -y \
+    libGL \
+    libglib2.0-0 \
+    libSM6 \
+    libXext6 \
+    libXrender-dev \
+    libgomp1 \
+    libgtk-3-0 \
+    && yum clean all
+
 # Copy requirements and install dependencies
-COPY requirements.txt ${LAMBDA_TASK_ROOT}/
-RUN pip install -r requirements.txt
+COPY requirements-lambda.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r requirements-lambda.txt
 
 # Copy application code
 COPY lambda_handler.py ${LAMBDA_TASK_ROOT}/

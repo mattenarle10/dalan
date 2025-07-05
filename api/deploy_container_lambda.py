@@ -113,7 +113,24 @@ def deploy_container_lambda():
             )
             print("✅ Function created")
         
-        print(f"✅ Deployment complete!")
+        # Update function configuration with environment variables
+        print("Setting environment variables...")
+        lambda_client.update_function_configuration(
+            FunctionName=function_name,
+            Environment={
+                'Variables': {
+                    'SUPABASE_URL': 'https://iewjtoeuvejhhganyqhf.supabase.co',
+                    'SUPABASE_KEY': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NzAzMjgsImV4cCI6MjA2NDQ0NjMyOH0.kEcUepX8vjMaddw-_khaJBtZiwG1uANO2ymCFSTCPiI',
+                    'SUPABASE_SERVICE_ROLE_KEY': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODg3MDMyOCwiZXhwIjoyMDY0NDQ2MzI4fQ.Uw6tQxGOOJOAoLvpN0qH8VYWjNhWEgFJTJQcKOLlGFU',
+                    'SUPABASE_JWT_SECRET': 'your-jwt-secret-here',
+                    'MODEL_S3_BUCKET': 'dalan-yolo-models',
+                    'MODEL_S3_KEY': 'models/YOLOv8_Small_RDD.pt',
+                    'ENVIRONMENT': 'production'
+                }
+            }
+        )
+
+        print(f"Lambda function '{function_name}' updated successfully!")
         print(f"Function ARN: {response['FunctionArn']}")
         print(f"Image URI: {image_uri}")
         

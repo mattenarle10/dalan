@@ -16,9 +16,6 @@ import aiohttp
 import uvicorn 
 import jwt
 from jwt.exceptions import InvalidAudienceError
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
 from PIL import Image
 import io
 import tempfile
@@ -32,13 +29,6 @@ from s3_model_loader import s3_loader
 
 # Load environment variables
 load_dotenv()
-
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
-)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -315,7 +305,7 @@ async def classify_image(image: str, user_id: str = None):
 
         # Encode result image to jpg and save it
         _, buffer = cv2.imencode('.jpg', img)
-        classified_image_url = save_image(buffer.tobytes(), user_id)
+        classified_image_url = save_image(buffer.tobytes(), user_id, "classified")
         
         # Prepare detection summary
         detection_summary = {
@@ -375,14 +365,14 @@ async def create_entry(
         # Get user_id from authenticated user
         user_id = current_user["id"]
         
-        # Process the image
+        # Read image data first
         image_data = await image.read()
+        
+        # Save the image to S3
+        image_url = save_image(image_data, user_id, "original")
         
         # Classify the image using AI
         crack_type = classify_crack_image(image_data)
-        
-        # Save the image and get URL
-        image_url = save_image(image_data, user_id)
 
         # Classify the image and get the detection summary
         detection_summary = await classify_image(image_url, user_id)

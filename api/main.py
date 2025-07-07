@@ -1,28 +1,31 @@
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from typing import List, Optional
 import json
 from datetime import datetime
 import uuid
 import logging
-from typing import List
-from fastapi.responses import JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from ultralytics import YOLO
 import numpy as np
 import cv2
 import os
-import uuid
 import base64
 import aiohttp
 import uvicorn 
 import jwt
+from jwt.exceptions import InvalidAudienceError
+from PIL import Image
+import io
+import tempfile
+from ultralytics import YOLO
+import traceback
 from dotenv import load_dotenv
 from models import RoadCrackCreate, RoadCrackResponse, RoadCrackUpdate, User
 import database as db
 from utils import classify_crack_image, save_image, format_entry_response
-from jwt import InvalidAudienceError
+from s3_model_loader import s3_loader
 
 # Load environment variables
 load_dotenv()
@@ -31,12 +34,20 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Set absolute path to the model file
-model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../model/YOLOv8_Small_RDD.pt"))
-logger.info(f"Loading YOLO model from: {model_path}")
+# Load YOLO model from S3 or local fallback
+logger.info("Loading YOLO model...")
 
-# Try to load YOLO model
 try:
+    # Check if we're in production (prefer S3) or development (prefer local)
+    prefer_s3 = os.getenv("ENVIRONMENT", "development") == "production"
+    
+    model_path = s3_loader.get_model_path(prefer_s3=prefer_s3)
+    
+    if not model_path:
+        raise Exception("Could not get model path from S3 or local fallback")
+    
+    logger.info(f"Loading YOLO model from: {model_path}")
+    
     # Patch torch.load to use weights_only=False for loading YOLO model
     import torch
     original_load = torch.load
@@ -56,6 +67,8 @@ try:
     logger.info("YOLO model loaded successfully")
 except Exception as e:
     logger.warning(f"Could not load YOLO model: {e}")
+    logger.warning("Traceback:")
+    logger.warning(traceback.format_exc())
     model = None
     USE_YOLO = False
 
@@ -292,7 +305,7 @@ async def classify_image(image: str, user_id: str = None):
 
         # Encode result image to jpg and save it
         _, buffer = cv2.imencode('.jpg', img)
-        classified_image_url = save_image(buffer.tobytes(), user_id)
+        classified_image_url = save_image(buffer.tobytes(), user_id, "classified")
         
         # Prepare detection summary
         detection_summary = {
@@ -352,14 +365,14 @@ async def create_entry(
         # Get user_id from authenticated user
         user_id = current_user["id"]
         
-        # Process the image
+        # Read image data first
         image_data = await image.read()
+        
+        # Save the image to S3
+        image_url = save_image(image_data, user_id, "original")
         
         # Classify the image using AI
         crack_type = classify_crack_image(image_data)
-        
-        # Save the image and get URL
-        image_url = save_image(image_data, user_id)
 
         # Classify the image and get the detection summary
         detection_summary = await classify_image(image_url, user_id)

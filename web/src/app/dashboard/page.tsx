@@ -1,14 +1,14 @@
 'use client'
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon } from "lucide-react";
+import { MapPin, AlertTriangle, Filter, User, Users, Search, X, ChevronDown, MapIcon, Loader } from "lucide-react";
 import Link from "next/link";
 import Modal from "@/components/modal/Modal";
 import { RoadCrackEntry } from "@/lib/interface";
 import { useEntries } from "@/lib/swr-hooks";
 
-export default function Dashboard() {
+function DashboardContent() {
   const { entries = [], isLoading: loading } = useEntries();
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
@@ -370,5 +370,13 @@ export default function Dashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<Loader size={40} className="mx-auto mt-20" />}>
+      <DashboardContent />
+    </Suspense>
   );
 }

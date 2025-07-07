@@ -27,7 +27,7 @@ const fetcher = async (url: string) => {
   
   // If user is authenticated, mark their entries
   if (session?.user?.id && Array.isArray(data)) {
-    return data.map((entry: any) => ({
+    return data.map((entry: { user?: { id: string }; [key: string]: unknown }) => ({
       ...entry,
       user: {
         ...entry.user,

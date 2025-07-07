@@ -229,7 +229,6 @@ function AddEntryContent() {
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false)
-  const [isDraggingPin, setIsDraggingPin] = useState(false)
   const [showLocationFeedback, setShowLocationFeedback] = useState(false)
   
   const mapContainer = useRef<HTMLDivElement | null>(null)
@@ -297,7 +296,7 @@ function AddEntryContent() {
       // Initial reverse geocoding
       handleMapCenterChanged(coordinates);
     }
-  }, []); // Only run once on mount
+  }, [coordinates, handleMapCenterChanged, location]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -332,7 +331,7 @@ function AddEntryContent() {
       const data = await response.json()
       
       if (data.features) {
-        const results = data.features.map((feature: any) => ({
+        const results = data.features.map((feature: { place_name: string; center: [number, number] }) => ({
           place_name: feature.place_name,
           center: feature.center
         }))
@@ -736,7 +735,7 @@ function AddEntryContent() {
                   <p className="text-sm font-medium text-foreground truncate">
                     {location || 'No location selected'}
                   </p>
-                  <div className={`text-xs font-mono mt-0.5 ${isDraggingPin ? 'text-dalan-yellow font-bold' : 'text-muted-foreground'} transition-all duration-75`}>
+                  <div className={`text-xs font-mono mt-0.5 text-muted-foreground transition-all duration-75`}>
                     {coordinates[1].toFixed(6)}, {coordinates[0].toFixed(6)}
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Literal, Optional
 from datetime import datetime
 
@@ -11,8 +11,7 @@ class User(UserBase):
     """User model with current user flag"""
     is_current_user: bool = Field(False, alias="isCurrentUser")
     
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 class RoadCrackBase(BaseModel):
     """Base model for road crack entries with common fields"""
@@ -44,8 +43,7 @@ class RoadCrackResponse(RoadCrackBase):
     type: str  # Determined by AI
     user: User
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ClassificationResponse(BaseModel):
     """Response model for AI classification"""
@@ -73,3 +71,18 @@ class DetectionSummary(BaseModel):
     total_cracks: int
     crack_types: dict
     created_at: datetime
+
+# For backward compatibility with the existing code
+class RoadCrackEntry(RoadCrackResponse):
+    """Alias for backward compatibility"""
+    pass
+
+class YOLODetection(BaseModel):
+    """Model for YOLO detection results"""
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+    confidence: float
+    class_id: int
+    label: str

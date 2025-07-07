@@ -6,19 +6,16 @@ from PIL import Image
 import io
 import base64
 import random
-import cloudinary
-import cloudinary.uploader
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET")
-)
+# Configure S3 client
+s3_client = boto3.client('s3')
+S3_BUCKET = "dalan-yolo-models"  # Using your existing bucket
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,36 +44,53 @@ def classify_crack_image(image_data):
         # Default to alligator if classification fails
         return "alligator"
 
-def save_image(image_data, user_id):
+def save_image(image_data, user_id, image_type="original"):
     """
-    Save image to Cloudinary storage
+    Save image to S3 storage
     
     Args:
         image_data (bytes): Image data
         user_id (str): User ID for filename
+        image_type (str): "original" or "classified"
         
     Returns:
         str: URL to the saved image
     """
     try:
-        # Generate a unique public_id for Cloudinary
+        # Generate a unique filename
         unique_id = str(uuid.uuid4())
+        s3_key = f"images/{image_type}/{user_id}/{unique_id}.jpg"
         
-        # Upload to Cloudinary
-        # The folder structure will be: dalan/user_id/unique_id
-        result = cloudinary.uploader.upload(
-            image_data,
-            public_id=f"dalan/{user_id}/{unique_id}",
-            overwrite=True,
-            resource_type="image"
+        logger.info(f"Saving {image_type} image - type: {type(image_data)}, size: {len(image_data)} bytes")
+        
+        # Create BytesIO object from bytes
+        image_file = io.BytesIO(image_data)
+        
+        # Upload to S3
+        s3_client.upload_fileobj(
+            image_file,
+            S3_BUCKET,
+            s3_key,
+            ExtraArgs={
+                'ContentType': 'image/jpeg'
+                # Removed ACL since bucket doesn't allow ACLs
+            }
         )
         
-        # Return the secure URL from Cloudinary
-        return result["secure_url"]
+        # Generate public URL
+        image_url = f"https://{S3_BUCKET}.s3.amazonaws.com/{s3_key}"
+        
+        logger.info(f"Successfully uploaded {image_type} image: {image_url}")
+        return image_url
+        
+    except ClientError as e:
+        logger.error(f"S3 error saving {image_type} image: {e}")
+        return "https://placehold.co/400x300/cccccc/666666/png?text=Upload+Failed"
     except Exception as e:
-        logger.error(f"Error saving image to Cloudinary: {e}")
-        # If upload fails, return a placeholder image
-        return "https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg"
+        logger.error(f"Error saving {image_type} image to S3: {e}")
+        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error details: {str(e)}")
+        return "https://placehold.co/400x300/cccccc/666666/png?text=Upload+Failed"
 
 def format_entry_response(entry, user):
     """

@@ -1,18 +1,14 @@
-import os
-from dotenv import load_dotenv
 from supabase import create_client, Client
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Load environment variables
-load_dotenv()
-
-# Get Supabase credentials from environment variables
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+import os
+from config import (
+    logger, 
+    SUPABASE_URL, 
+    SUPABASE_KEY, 
+    SUPABASE_SERVICE_ROLE_KEY,
+    ROAD_CRACKS_TABLE,
+    CRACK_DETECTIONS_TABLE,
+    DETECTION_SUMMARIES_TABLE
+)
 
 # Initialize Supabase client
 try:
@@ -21,11 +17,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Supabase client: {e}")
     supabase = None
-
-# Table names
-ROAD_CRACKS_TABLE = "road_cracks"
-CRACK_DETECTIONS_TABLE = "crack_detections"
-DETECTION_SUMMARIES_TABLE = "detection_summaries"
 
 # Road crack entries functions
 def get_all_entries(user_id=None, severity=None, crack_type=None):
@@ -208,7 +199,7 @@ def get_auth_user(user_id):
     try:
         # Use Supabase Management API to get user info
         # This requires service role key
-        service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        service_role_key = SUPABASE_SERVICE_ROLE_KEY
         
         if not service_role_key:
             logger.warning("SUPABASE_SERVICE_ROLE_KEY not set, cannot access auth.users directly")

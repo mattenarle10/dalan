@@ -21,9 +21,9 @@ def init_model():
     global model, USE_YOLO
     
     try:
-        # Try to import the s3_model_loader module
+        # Import the s3_model_loader module from services
         try:
-            import s3_model_loader as s3_loader
+            from services import s3_model_loader as s3_loader
         except ImportError:
             logger.warning("s3_model_loader module not found, using fallback")
             # Define a fallback loader if the module is not available

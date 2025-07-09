@@ -14,8 +14,8 @@ provider:
     SUPABASE_KEY: ${env:SUPABASE_KEY}
     SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
     SUPABASE_JWT_SECRET: ${env:SUPABASE_JWT_SECRET}
-    MODEL_S3_BUCKET: dalan-yolo-models
-    MODEL_S3_KEY: models/YOLOv8_Small_RDD.pt
+    MODEL_S3_BUCKET: dalan
+    MODEL_S3_KEY: model/YOLOv8_Small_RDD.pt
     ENVIRONMENT: production
     YOLO_QUEUE_URL: 
       Ref: YoloProcessingQueue

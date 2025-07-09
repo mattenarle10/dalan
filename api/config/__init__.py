@@ -12,6 +12,8 @@ from config.settings import (
     SUPABASE_JWT_SECRET,
     SUPABASE_SERVICE_ROLE_KEY,
     S3_BUCKET,
+    MODEL_S3_KEY,
+    USE_S3_MODEL,
     YOLO_QUEUE_URL,
     
     # Table names

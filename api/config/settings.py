@@ -21,7 +21,9 @@ SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # S3 Configuration
-S3_BUCKET = "dalan-yolo-models"
+S3_BUCKET = os.getenv("S3_BUCKET")
+MODEL_S3_KEY = os.getenv("MODEL_S3_KEY")
+USE_S3_MODEL = os.getenv("USE_S3_MODEL")
 
 # SQS Configuration
 YOLO_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/888184096163/dalan-yolo-processing"

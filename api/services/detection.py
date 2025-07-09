@@ -29,6 +29,13 @@ def init_model():
             # Define a fallback loader if the module is not available
             class FallbackLoader:
                 def get_model_path(self, prefer_s3=False):
+                    # Use the custom model if it exists
+                    custom_model_path = "/Users/matt/dalan/model/YOLOv8_Small_RDD.pt"
+                    if os.path.exists(custom_model_path):
+                        logger.info(f"Using custom model: {custom_model_path}")
+                        return custom_model_path
+                    # Fall back to default model if custom model doesn't exist
+                    logger.warning("Custom model not found, using default model")
                     return "yolov8n.pt"  # Default model path
             s3_loader = FallbackLoader()
         

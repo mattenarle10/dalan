@@ -24,7 +24,7 @@ try:
     logger.info("✅ Database imports successful")
     
     # Test importing utils
-    from utils import format_entry_response, save_image_to_s3
+    from utils import format_entry_response, save_image
     logger.info("✅ Utils imports successful")
     
     # Test importing routers

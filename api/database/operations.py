@@ -1,3 +1,4 @@
+# Import the external supabase package
 from supabase import create_client, Client
 import os
 from config import (

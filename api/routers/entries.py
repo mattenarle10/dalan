@@ -5,7 +5,7 @@ import logging
 import uuid
 from datetime import datetime
 from models import RoadCrackUpdate
-from supabase import get_all_entries, get_entry_by_id, get_detection_summary, create_entry, update_entry, delete_entry, get_user
+from database import get_all_entries, get_entry_by_id, get_detection_summary, create_entry, update_entry, delete_entry, get_user
 from services.storage import save_image
 from services.detection import queue_detection_job, classify_crack_image
 from utils import format_entry_response

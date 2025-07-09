@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import os
-from supabase import get_auth_user
+from database import get_auth_user
 from models import User
 from config import logger, SUPABASE_JWT_SECRET
 

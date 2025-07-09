@@ -1,5 +1,5 @@
-# Import and expose all Supabase database operations
-from supabase.operations import (
+# Import and expose all database operations
+from database.operations import (
     get_all_entries,
     get_entry_by_id,
     get_crack_detections,

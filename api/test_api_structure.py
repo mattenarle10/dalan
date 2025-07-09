@@ -19,9 +19,9 @@ try:
     from models import UserBase, RoadCrackBase
     logger.info("✅ Models imports successful")
     
-    # Test importing supabase
-    from supabase import get_all_entries, get_user
-    logger.info("✅ Supabase imports successful")
+    # Test importing database
+    from database import get_all_entries, get_user
+    logger.info("✅ Database imports successful")
     
     # Test importing utils
     from utils import format_entry_response, save_image_to_s3

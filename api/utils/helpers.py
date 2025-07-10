@@ -12,7 +12,7 @@ from config import logger, S3_BUCKET
 s3_client = boto3.client('s3')
 
 # Crack types for classification
-CRACK_TYPES = ["alligator", "longitudinal", "transverse"]
+CRACK_TYPES = ["alligator", "longitudinal", "transverse", "pothole"]
 
 def classify_crack_image(image_data):
     """

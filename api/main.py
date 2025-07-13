@@ -38,6 +38,14 @@ def read_root():
     """Root endpoint that returns a welcome message"""
     return {"message": "Welcome to Dalan API"}
 
+# Lambda handler for serverless deployment
+try:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+except ImportError:
+    # Mangum not available in local development
+    handler = None
+
 # Run the application if executed directly
 if __name__ == "__main__":
     import uvicorn

@@ -11,22 +11,23 @@
         "runtime": "python3.9",
         "region": "us-east-1",
         "stage": "dev",
+        "deploymentBucket": "dalan",
         "profile": "dalan",
         "memorySize": 1024,
         "timeout": 30,
         "environment": {
-          "ENVIRONMENT": "${self:provider.stage}",
-          "SUPABASE_URL": "${env:SUPABASE_URL}",
-          "SUPABASE_KEY": "${env:SUPABASE_KEY}",
-          "SUPABASE_SERVICE_ROLE_KEY": "${env:SUPABASE_SERVICE_ROLE_KEY}",
+          "ENVIRONMENT": "dev",
+          "SUPABASE_URL": "https://iewjtoeuvejhhganyqhf.supabase.co",
+          "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NzAzMjgsImV4cCI6MjA2NDQ0NjMyOH0.kEcUepX8vjMaddw-_khaJBtZiwG1uANO2ymCFSTCPiI",
+          "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODg3MDMyOCwiZXhwIjoyMDY0NDQ2MzI4fQ.ma7huqUZ7OGHbx65gIS3LEkyhZHGW95DO5Ho2J0hmm0",
           "SUPABASE_JWT_SECRET": "<REDACTED>",
-          "S3_BUCKET": "${self:custom.s3BucketName}",
+          "S3_BUCKET": "dalan",
           "MODEL_S3_KEY": "model/YOLOv8_Small_RDD.pt",
-          "USE_S3_MODEL": true,
+          "USE_S3_MODEL": "true",
           "YOLO_QUEUE_URL": {
             "Ref": "YoloProcessingQueue"
           },
-          "AWS_REGION": "${self:provider.region}"
+          "AWS_REGION": "us-east-1"
         },
         "iam": {
           "role": {
@@ -38,14 +39,14 @@
                   "s3:PutObject",
                   "s3:DeleteObject"
                 ],
-                "Resource": "arn:aws:s3:::${self:custom.s3BucketName}/*"
+                "Resource": "arn:aws:s3:::dalan/*"
               },
               {
                 "Effect": "Allow",
                 "Action": [
                   "s3:ListBucket"
                 ],
-                "Resource": "arn:aws:s3:::${self:custom.s3BucketName}"
+                "Resource": "arn:aws:s3:::dalan"
               },
               {
                 "Effect": "Allow",
@@ -75,14 +76,164 @@
               }
             ]
           }
+        },
+        "versionFunctions": true,
+        "deploymentBucketObject": {
+          "name": "dalan",
+          "serverSideEncryption": "AES256"
+        },
+        "compiledCloudFormationTemplate": {
+          "AWSTemplateFormatVersion": "2010-09-09",
+          "Description": "The AWS CloudFormation template for this Serverless application",
+          "Resources": {
+            "ApiLogGroup": {
+              "Type": "AWS::Logs::LogGroup",
+              "Properties": {
+                "LogGroupName": "/aws/lambda/dalan-api-dev-api"
+              }
+            },
+            "YoloProcessorLogGroup": {
+              "Type": "AWS::Logs::LogGroup",
+              "Properties": {
+                "LogGroupName": "/aws/lambda/dalan-api-dev-yoloProcessor"
+              }
+            },
+            "IamRoleLambdaExecution": {
+              "Type": "AWS::IAM::Role",
+              "Properties": {
+                "AssumeRolePolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Principal": {
+                        "Service": [
+                          "lambda.amazonaws.com"
+                        ]
+                      },
+                      "Action": [
+                        "sts:AssumeRole"
+                      ]
+                    }
+                  ]
+                },
+                "Policies": [
+                  {
+                    "PolicyName": {
+                      "Fn::Join": [
+                        "-",
+                        [
+                          "dalan-api",
+                          "dev",
+                          "lambda"
+                        ]
+                      ]
+                    },
+                    "PolicyDocument": {
+                      "Version": "2012-10-17",
+                      "Statement": [
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "logs:CreateLogStream",
+                            "logs:CreateLogGroup",
+                            "logs:TagResource"
+                          ],
+                          "Resource": [
+                            {
+                              "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dalan-api-dev*:*"
+                            }
+                          ]
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "logs:PutLogEvents"
+                          ],
+                          "Resource": [
+                            {
+                              "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dalan-api-dev*:*:*"
+                            }
+                          ]
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject"
+                          ],
+                          "Resource": "arn:aws:s3:::dalan/*"
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "s3:ListBucket"
+                          ],
+                          "Resource": "arn:aws:s3:::dalan"
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "sqs:SendMessage",
+                            "sqs:ReceiveMessage",
+                            "sqs:DeleteMessage",
+                            "sqs:GetQueueAttributes"
+                          ],
+                          "Resource": [
+                            {
+                              "Fn::GetAtt": [
+                                "YoloProcessingQueue",
+                                "Arn"
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "Effect": "Allow",
+                          "Action": [
+                            "logs:CreateLogGroup",
+                            "logs:CreateLogStream",
+                            "logs:PutLogEvents"
+                          ],
+                          "Resource": "*"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "Path": "/",
+                "RoleName": {
+                  "Fn::Join": [
+                    "-",
+                    [
+                      "dalan-api",
+                      "dev",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "lambdaRole"
+                    ]
+                  ]
+                }
+              }
+            }
+          },
+          "Outputs": {
+            "ServerlessDeploymentBucketName": {
+              "Value": "dalan"
+            }
+          }
         }
       },
       "custom": {
         "s3BucketName": "dalan",
         "pythonRequirements": {
-          "dockerizePip": "non-linux",
+          "dockerizePip": false,
           "slim": true,
           "strip": false,
+          "useDownloadCache": true,
+          "useStaticCache": true,
           "noDeploy": [
             "boto3",
             "botocore"
@@ -135,7 +286,8 @@
           ],
           "layers": [
             "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1"
-          ]
+          ],
+          "name": "dalan-api-dev-api"
         },
         "yoloProcessor": {
           "handler": "services.yolo_processor.handler",
@@ -150,14 +302,14 @@
                     "Arn"
                   ]
                 },
-                "batchSize": 1,
-                "maximumBatchingWindowInSeconds": 10
+                "batchSize": 1
               }
             }
           ],
           "layers": [
             "arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1"
-          ]
+          ],
+          "name": "dalan-api-dev-yoloProcessor"
         }
       },
       "resources": {
@@ -165,7 +317,7 @@
           "YoloProcessingQueue": {
             "Type": "AWS::SQS::Queue",
             "Properties": {
-              "QueueName": "dalan-yolo-processing-${self:provider.stage}",
+              "QueueName": "dalan-yolo-processing-dev",
               "VisibilityTimeoutSeconds": 360,
               "MessageRetentionPeriod": 1209600,
               "ReceiveMessageWaitTimeSeconds": 20
@@ -174,7 +326,7 @@
           "YoloProcessingDLQ": {
             "Type": "AWS::SQS::Queue",
             "Properties": {
-              "QueueName": "dalan-yolo-processing-dlq-${self:provider.stage}",
+              "QueueName": "dalan-yolo-processing-dlq-dev",
               "MessageRetentionPeriod": 1209600
             }
           }
@@ -196,7 +348,9 @@
           "!.DS_Store",
           "!*.pyc",
           "!*.pyo"
-        ]
+        ],
+        "artifactsS3KeyDirname": "serverless/dalan-api/dev/code-artifacts",
+        "deploymentBucket": "dalan"
       }
     },
     "provider": {
@@ -204,22 +358,23 @@
       "runtime": "python3.9",
       "region": "us-east-1",
       "stage": "dev",
+      "deploymentBucket": "dalan",
       "profile": "dalan",
       "memorySize": 1024,
       "timeout": 30,
       "environment": {
-        "ENVIRONMENT": "${self:provider.stage}",
-        "SUPABASE_URL": "${env:SUPABASE_URL}",
-        "SUPABASE_KEY": "${env:SUPABASE_KEY}",
-        "SUPABASE_SERVICE_ROLE_KEY": "${env:SUPABASE_SERVICE_ROLE_KEY}",
+        "ENVIRONMENT": "dev",
+        "SUPABASE_URL": "https://iewjtoeuvejhhganyqhf.supabase.co",
+        "SUPABASE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NzAzMjgsImV4cCI6MjA2NDQ0NjMyOH0.kEcUepX8vjMaddw-_khaJBtZiwG1uANO2ymCFSTCPiI",
+        "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlld2p0b2V1dmVqaGhnYW55cWhmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODg3MDMyOCwiZXhwIjoyMDY0NDQ2MzI4fQ.ma7huqUZ7OGHbx65gIS3LEkyhZHGW95DO5Ho2J0hmm0",
         "SUPABASE_JWT_SECRET": "<REDACTED>",
-        "S3_BUCKET": "${self:custom.s3BucketName}",
+        "S3_BUCKET": "dalan",
         "MODEL_S3_KEY": "model/YOLOv8_Small_RDD.pt",
-        "USE_S3_MODEL": true,
+        "USE_S3_MODEL": "true",
         "YOLO_QUEUE_URL": {
           "Ref": "YoloProcessingQueue"
         },
-        "AWS_REGION": "${self:provider.region}"
+        "AWS_REGION": "us-east-1"
       },
       "iam": {
         "role": {
@@ -231,14 +386,14 @@
                 "s3:PutObject",
                 "s3:DeleteObject"
               ],
-              "Resource": "arn:aws:s3:::${self:custom.s3BucketName}/*"
+              "Resource": "arn:aws:s3:::dalan/*"
             },
             {
               "Effect": "Allow",
               "Action": [
                 "s3:ListBucket"
               ],
-              "Resource": "arn:aws:s3:::${self:custom.s3BucketName}"
+              "Resource": "arn:aws:s3:::dalan"
             },
             {
               "Effect": "Allow",
@@ -268,26 +423,184 @@
             }
           ]
         }
+      },
+      "versionFunctions": true,
+      "deploymentBucketObject": {
+        "name": "dalan",
+        "serverSideEncryption": "AES256"
+      },
+      "compiledCloudFormationTemplate": {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "The AWS CloudFormation template for this Serverless application",
+        "Resources": {
+          "ApiLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/dalan-api-dev-api"
+            }
+          },
+          "YoloProcessorLogGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+              "LogGroupName": "/aws/lambda/dalan-api-dev-yoloProcessor"
+            }
+          },
+          "IamRoleLambdaExecution": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+              "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Principal": {
+                      "Service": [
+                        "lambda.amazonaws.com"
+                      ]
+                    },
+                    "Action": [
+                      "sts:AssumeRole"
+                    ]
+                  }
+                ]
+              },
+              "Policies": [
+                {
+                  "PolicyName": {
+                    "Fn::Join": [
+                      "-",
+                      [
+                        "dalan-api",
+                        "dev",
+                        "lambda"
+                      ]
+                    ]
+                  },
+                  "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogStream",
+                          "logs:CreateLogGroup",
+                          "logs:TagResource"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dalan-api-dev*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/dalan-api-dev*:*:*"
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "s3:GetObject",
+                          "s3:PutObject",
+                          "s3:DeleteObject"
+                        ],
+                        "Resource": "arn:aws:s3:::dalan/*"
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "s3:ListBucket"
+                        ],
+                        "Resource": "arn:aws:s3:::dalan"
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "sqs:SendMessage",
+                          "sqs:ReceiveMessage",
+                          "sqs:DeleteMessage",
+                          "sqs:GetQueueAttributes"
+                        ],
+                        "Resource": [
+                          {
+                            "Fn::GetAtt": [
+                              "YoloProcessingQueue",
+                              "Arn"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Effect": "Allow",
+                        "Action": [
+                          "logs:CreateLogGroup",
+                          "logs:CreateLogStream",
+                          "logs:PutLogEvents"
+                        ],
+                        "Resource": "*"
+                      }
+                    ]
+                  }
+                }
+              ],
+              "Path": "/",
+              "RoleName": {
+                "Fn::Join": [
+                  "-",
+                  [
+                    "dalan-api",
+                    "dev",
+                    {
+                      "Ref": "AWS::Region"
+                    },
+                    "lambdaRole"
+                  ]
+                ]
+              }
+            }
+          }
+        },
+        "Outputs": {
+          "ServerlessDeploymentBucketName": {
+            "Value": "dalan"
+          }
+        }
       }
     },
     "dashboard": {
       "isEnabledForService": false,
-      "requiredAuthentication": true,
+      "requiredAuthentication": false,
       "orgFeaturesInUse": null,
       "orgObservabilityIntegrations": null,
       "serviceAppId": null,
       "serviceProvider": null,
       "instanceParameters": null
     },
-    "serviceRawFile": "service: dalan-api\n\nframeworkVersion: '4'\n\nprovider:\n  name: aws\n  runtime: python3.9\n  region: us-east-1\n  stage: ${opt:stage, 'dev'}\n  profile: dalan  # Your AWS profile\n  memorySize: 1024  # Increased for YOLO model processing\n  timeout: 30       # Increased timeout for image processing\n  \n  # Environment variables\n  environment:\n    ENVIRONMENT: ${self:provider.stage}\n    SUPABASE_URL: ${env:SUPABASE_URL}\n    SUPABASE_KEY: ${env:SUPABASE_KEY}\n    SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}\n    SUPABASE_JWT_SECRET: ${env:SUPABASE_JWT_SECRET}\n    S3_BUCKET: ${self:custom.s3BucketName}\n    MODEL_S3_KEY: model/YOLOv8_Small_RDD.pt\n    USE_S3_MODEL: true\n    YOLO_QUEUE_URL: \n      Ref: YoloProcessingQueue\n    AWS_REGION: ${self:provider.region}\n  \n  # IAM permissions\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - s3:GetObject\n            - s3:PutObject\n            - s3:DeleteObject\n          Resource: \"arn:aws:s3:::${self:custom.s3BucketName}/*\"\n        - Effect: Allow\n          Action:\n            - s3:ListBucket\n          Resource: \"arn:aws:s3:::${self:custom.s3BucketName}\"\n        - Effect: Allow\n          Action:\n            - sqs:SendMessage\n            - sqs:ReceiveMessage\n            - sqs:DeleteMessage\n            - sqs:GetQueueAttributes\n          Resource:\n            - Fn::GetAtt: [YoloProcessingQueue, Arn]\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n          Resource: \"*\"\n\n# Custom variables\ncustom:\n  s3BucketName: dalan  # Use existing bucket\n  pythonRequirements:\n    dockerizePip: non-linux\n    slim: true\n    strip: false\n    noDeploy:\n      - boto3\n      - botocore\n    pipCmdExtraArgs:\n      - --no-cache-dir\n  \n  # API Gateway settings - using default AWS domain\n  # customDomain: disabled - no custom domain needed\n\n# Functions\nfunctions:\n  # Main API function\n  api:\n    handler: main.handler\n    events:\n      - http:\n          path: /{proxy+}\n          method: ANY\n          cors:\n            origin: '*'\n            headers:\n              - Content-Type\n              - X-Amz-Date\n              - Authorization\n              - X-Api-Key\n              - X-Amz-Security-Token\n              - X-Amz-User-Agent\n            allowCredentials: false\n      - http:\n          path: /\n          method: ANY\n          cors:\n            origin: '*'\n            headers:\n              - Content-Type\n              - X-Amz-Date\n              - Authorization\n              - X-Api-Key\n              - X-Amz-Security-Token\n              - X-Amz-User-Agent\n            allowCredentials: false\n    layers:\n      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1  # OpenCV layer\n  \n  # YOLO processing function (async)\n  yoloProcessor:\n    handler: services.yolo_processor.handler\n    memorySize: 2048  # Higher memory for YOLO processing\n    timeout: 300      # 5 minutes for processing\n    events:\n      - sqs:\n          arn:\n            Fn::GetAtt:\n              - YoloProcessingQueue\n              - Arn\n          batchSize: 1\n          maximumBatchingWindowInSeconds: 10\n    layers:\n      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1\n\n# Resources\nresources:\n  Resources:\n    # Note: Using existing S3 bucket 'dalan' - no need to create new one\n    \n    # SQS Queue for YOLO processing\n    YoloProcessingQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: dalan-yolo-processing-${self:provider.stage}\n        VisibilityTimeoutSeconds: 360  # 6 minutes (longer than function timeout)\n        MessageRetentionPeriod: 1209600  # 14 days\n        ReceiveMessageWaitTimeSeconds: 20  # Long polling\n    \n    # Dead Letter Queue for failed processing\n    YoloProcessingDLQ:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: dalan-yolo-processing-dlq-${self:provider.stage}\n        MessageRetentionPeriod: 1209600  # 14 days\n\n# Plugins\nplugins:\n  - serverless-python-requirements\n  - serverless-offline\n\n# Package settings\npackage:\n  patterns:\n    - '!node_modules/**'\n    - '!.git/**'\n    - '!.pytest_cache/**'\n    - '!tests/**'\n    - '!.env'\n    - '!venv/**'\n    - '!__pycache__/**'\n    - '!.DS_Store'\n    - '!*.pyc'\n    - '!*.pyo'",
+    "error": {
+      "message": "spawn python3.9 ENOENT",
+      "stack": "Error: spawn python3.9 ENOENT\n    at ChildProcess._handle.onexit (node:internal/child_process:286:19)\n    at onErrorNT (node:internal/child_process:484:16)\n    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)",
+      "code": "ENOENT"
+    },
+    "serviceRawFile": "service: dalan-api\n\nframeworkVersion: '4'\n\nprovider:\n  name: aws\n  runtime: python3.9\n  region: us-east-1\n  stage: ${opt:stage, 'dev'}\n  deploymentBucket:\n    name: dalan\n    serverSideEncryption: AES256\n  profile: dalan  # Your AWS profile\n  memorySize: 1024  # Increased for YOLO model processing\n  timeout: 30       # Increased timeout for image processing\n  \n  # Environment variables\n  environment:\n    ENVIRONMENT: ${self:provider.stage}\n    SUPABASE_URL: ${env:SUPABASE_URL}\n    SUPABASE_KEY: ${env:SUPABASE_KEY}\n    SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}\n    SUPABASE_JWT_SECRET: ${env:SUPABASE_JWT_SECRET}\n    S3_BUCKET: ${self:custom.s3BucketName}\n    MODEL_S3_KEY: model/YOLOv8_Small_RDD.pt\n    USE_S3_MODEL: true\n    YOLO_QUEUE_URL: \n      Ref: YoloProcessingQueue\n    AWS_REGION: ${self:provider.region}\n  \n  # IAM permissions\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - s3:GetObject\n            - s3:PutObject\n            - s3:DeleteObject\n          Resource: \"arn:aws:s3:::${self:custom.s3BucketName}/*\"\n        - Effect: Allow\n          Action:\n            - s3:ListBucket\n          Resource: \"arn:aws:s3:::${self:custom.s3BucketName}\"\n        - Effect: Allow\n          Action:\n            - sqs:SendMessage\n            - sqs:ReceiveMessage\n            - sqs:DeleteMessage\n            - sqs:GetQueueAttributes\n          Resource:\n            - Fn::GetAtt: [YoloProcessingQueue, Arn]\n        - Effect: Allow\n          Action:\n            - logs:CreateLogGroup\n            - logs:CreateLogStream\n            - logs:PutLogEvents\n          Resource: \"*\"\n\n# Custom variables\ncustom:\n  s3BucketName: dalan  # Use existing bucket\n  pythonRequirements:\n    dockerizePip: false\n    slim: true\n    strip: false\n    useDownloadCache: true\n    useStaticCache: true\n    noDeploy:\n      - boto3\n      - botocore\n    pipCmdExtraArgs:\n      - --no-cache-dir\n  \n  # API Gateway settings - using default AWS domain\n  # customDomain: disabled - no custom domain needed\n\n# Functions\nfunctions:\n  # Main API function\n  api:\n    handler: main.handler\n    events:\n      - http:\n          path: /{proxy+}\n          method: ANY\n          cors:\n            origin: '*'\n            headers:\n              - Content-Type\n              - X-Amz-Date\n              - Authorization\n              - X-Api-Key\n              - X-Amz-Security-Token\n              - X-Amz-User-Agent\n            allowCredentials: false\n      - http:\n          path: /\n          method: ANY\n          cors:\n            origin: '*'\n            headers:\n              - Content-Type\n              - X-Amz-Date\n              - Authorization\n              - X-Api-Key\n              - X-Amz-Security-Token\n              - X-Amz-User-Agent\n            allowCredentials: false\n    layers:\n      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1  # OpenCV layer\n  \n  # YOLO processing function (async)\n  yoloProcessor:\n    handler: services.yolo_processor.handler\n    memorySize: 2048  # Higher memory for YOLO processing\n    timeout: 300      # 5 minutes for processing\n    events:\n      - sqs:\n          arn:\n            Fn::GetAtt:\n              - YoloProcessingQueue\n              - Arn\n          batchSize: 1\n    layers:\n      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1\n\n# Resources\nresources:\n  Resources:\n    # Note: Using existing S3 bucket 'dalan' - no need to create new one\n    \n    # SQS Queue for YOLO processing\n    YoloProcessingQueue:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: dalan-yolo-processing-${self:provider.stage}\n        VisibilityTimeoutSeconds: 360  # 6 minutes (longer than function timeout)\n        MessageRetentionPeriod: 1209600  # 14 days\n        ReceiveMessageWaitTimeSeconds: 20  # Long polling\n    \n    # Dead Letter Queue for failed processing\n    YoloProcessingDLQ:\n      Type: AWS::SQS::Queue\n      Properties:\n        QueueName: dalan-yolo-processing-dlq-${self:provider.stage}\n        MessageRetentionPeriod: 1209600  # 14 days\n\n# Plugins\nplugins:\n  - serverless-python-requirements\n  - serverless-offline\n\n# Python requirements config\n\n# Package settings\npackage:\n  patterns:\n    - '!node_modules/**'\n    - '!.git/**'\n    - '!.pytest_cache/**'\n    - '!tests/**'\n    - '!.env'\n    - '!venv/**'\n    - '!__pycache__/**'\n    - '!.DS_Store'\n    - '!*.pyc'\n    - '!*.pyo'",
     "command": [
-      "login"
+      "deploy"
     ],
-    "options": {},
+    "options": {
+      "stage": "dev",
+      "verbose": true,
+      "aws-profile": "dalan"
+    },
     "orgId": "1f1f947e-cfb7-49dd-9b51-b7835d1524f3",
     "orgName": "sidequests",
     "userId": "Gtc9fX6Kt9SLklcFvn",
     "userName": "sidequests",
+    "serviceProviderAwsAccountId": "888184096163",
     "serviceProviderAwsCfStackId": null,
     "serviceProviderAwsCfStackCreated": null,
     "serviceProviderAwsCfStackUpdated": null,

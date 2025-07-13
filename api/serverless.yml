@@ -7,6 +7,9 @@ provider:
   runtime: python3.9
   region: us-east-1
   stage: ${opt:stage, 'dev'}
+  deploymentBucket:
+    name: dalan
+    serverSideEncryption: AES256
   profile: dalan  # Your AWS profile
   memorySize: 1024  # Increased for YOLO model processing
   timeout: 30       # Increased timeout for image processing
@@ -58,9 +61,11 @@ provider:
 custom:
   s3BucketName: dalan  # Use existing bucket
   pythonRequirements:
-    dockerizePip: non-linux
+    dockerizePip: false
     slim: true
     strip: false
+    useDownloadCache: true
+    useStaticCache: true
     noDeploy:
       - boto3
       - botocore
@@ -117,7 +122,6 @@ functions:
               - YoloProcessingQueue
               - Arn
           batchSize: 1
-          maximumBatchingWindowInSeconds: 10
     layers:
       - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1
 
@@ -146,6 +150,8 @@ resources:
 plugins:
   - serverless-python-requirements
   - serverless-offline
+
+# Python requirements config
 
 # Package settings
 package:

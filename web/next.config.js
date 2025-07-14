@@ -6,7 +6,8 @@ const nextConfig = {
       'lh3.googleusercontent.com',
       'lh4.googleusercontent.com',
       'lh5.googleusercontent.com',
-      'lh6.googleusercontent.com'
+      'lh6.googleusercontent.com',
+      'dalan.s3.amazonaws.com'
     ],
     remotePatterns: [
       {
@@ -32,6 +33,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'lh6.googleusercontent.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dalan.s3.amazonaws.com',
         pathname: '/**',
       },
     ],

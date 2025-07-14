@@ -1,0 +1,145 @@
+service: dalan-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-east-1
+  stage: ${opt:stage, 'prod'}
+  profile: dalan
+  
+  environment:
+    SUPABASE_URL: ${env:SUPABASE_URL}
+    SUPABASE_KEY: ${env:SUPABASE_KEY}
+    SUPABASE_SERVICE_ROLE_KEY: ${env:SUPABASE_SERVICE_ROLE_KEY}
+    SUPABASE_JWT_SECRET: ${env:SUPABASE_JWT_SECRET}
+    MODEL_S3_BUCKET: dalan
+    MODEL_S3_KEY: model/YOLOv8_Small_RDD.pt
+    ENVIRONMENT: production
+    YOLO_QUEUE_URL: 
+      Ref: YoloProcessingQueue
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource: 
+            - "arn:aws:s3:::dalan-yolo-models/*"
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource: 
+            - Fn::GetAtt: [YoloProcessingQueue, Arn]
+
+functions:
+  # Main API - lightweight without YOLO model
+  api:
+    handler: lambda_handler.lambda_handler
+    timeout: 30
+    memorySize: 512
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+    package:
+      exclude:
+        - model/**
+        - yolo_worker.py
+        - requirements-lambda.txt
+        - Dockerfile*
+        - deploy_*.py
+        
+  # YOLO Worker - heavy processing with layers
+  yolo-worker:
+    handler: yolo_worker.lambda_handler
+    timeout: 900
+    memorySize: 2048
+    layers:
+      - ${cf:dalan-ml-layer-${self:provider.stage}.PytorchOpenCVLayerExport}
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt: [YoloProcessingQueue, Arn]
+          batchSize: 1
+    package:
+      exclude:
+        - main.py
+        - lambda_handler.py
+        - requirements.txt
+        - Dockerfile*
+        - deploy_*.py
+
+resources:
+  Resources:
+    # SQS Queue for YOLO processing
+    YoloProcessingQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: dalan-yolo-processing-${self:provider.stage}
+        VisibilityTimeoutSeconds: 960
+        MessageRetentionPeriod: 1209600
+        
+    # API Gateway Custom Domain (optional)
+    ApiGatewayCustomDomain:
+      Type: AWS::ApiGateway::DomainName
+      Properties:
+        DomainName: api.dalan.app  # Your custom domain
+        CertificateArn: arn:aws:acm:us-east-1:123456789:certificate/your-cert-id
+        
+  Outputs:
+    ApiGatewayRestApiId:
+      Value:
+        Ref: ApiGatewayRestApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-restApiId
+        
+    YoloQueueUrl:
+      Value:
+        Ref: YoloProcessingQueue
+      Export:
+        Name: ${self:service}-${self:provider.stage}-yolo-queue-url
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+    slim: true
+    strip: false
+    useStaticCache: false
+    useDownloadCache: false
+    pipCmdExtraArgs:
+      - --no-cache-dir
+    noDeploy:
+      - boto3
+      - botocore
+      - numpy
+      - PIL
+      - uuid
+      - json
+      - logging
+      - datetime
+      - os
+      - tempfile
+      - base64
+      - random
+      - io
+      - traceback
+      - asyncio
+      - aiohttp 

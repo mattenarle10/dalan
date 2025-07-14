@@ -1,6 +1,4 @@
-import os
 import uuid
-import logging
 from datetime import datetime
 from PIL import Image
 import io
@@ -8,18 +6,10 @@ import base64
 import random
 import boto3
 from botocore.exceptions import ClientError
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+from config import logger, S3_BUCKET
 
 # Configure S3 client
 s3_client = boto3.client('s3')
-S3_BUCKET = "dalan-yolo-models"  # Using your existing bucket
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Crack types for classification
 CRACK_TYPES = ["alligator", "longitudinal", "transverse"]

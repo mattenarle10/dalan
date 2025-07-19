@@ -1,0 +1,1 @@
+Serverless AWS Lambda + API GW + S3 Typescript Backend

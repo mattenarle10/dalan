@@ -11,7 +11,7 @@ s3_client = boto3.client('s3')
 
 def save_image(image_data, user_id, image_type="original"):
     """
-    Save image to S3 storage
+    Save image to S3 storage with public access
     
     Args:
         image_data (bytes): Image data
@@ -31,15 +31,19 @@ def save_image(image_data, user_id, image_type="original"):
         # Create BytesIO object from bytes
         image_file = io.BytesIO(image_data)
         
-        # Upload to S3
+        # Upload to S3 (ACLs disabled due to bucket owner enforced setting)
+        extra_args = {
+            'ContentType': 'image/jpeg',
+            'CacheControl': 'max-age=31536000',  # Cache for 1 year
+        }
+        
+        # Note: ACLs are disabled for this bucket (owner enforced setting)
+        # Public access is controlled by bucket policy instead
         s3_client.upload_fileobj(
             image_file,
             S3_BUCKET,
             s3_key,
-            ExtraArgs={
-                'ContentType': 'image/jpeg'
-                # Removed ACL since bucket doesn't allow ACLs
-            }
+            ExtraArgs=extra_args
         )
         
         # Generate public URL

@@ -52,7 +52,7 @@ def verify_supabase_token(token: str) -> dict:
         logger.error(f"Error verifying token: {e}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     FastAPI dependency to get current authenticated user
     
@@ -71,11 +71,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid user ID in token")
             
-        # For now, just return the user ID and email
-        # In a real app, you'd fetch more user data from your database
+        # Extract more user data from the JWT payload
+        user_metadata = payload.get("user_metadata", {})
+        
         return {
             "id": user_id,
             "email": payload.get("email", ""),
+            "name": user_metadata.get("full_name") or user_metadata.get("name") or payload.get("email", "").split("@")[0],
+            "avatar_url": user_metadata.get("avatar_url") or user_metadata.get("picture"),
         }
     except HTTPException:
         raise

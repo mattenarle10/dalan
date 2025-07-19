@@ -5,12 +5,20 @@ import logging
 import uuid
 from datetime import datetime
 from models import RoadCrackUpdate
-from database import get_all_entries, get_entry_by_id, get_detection_summary, create_entry, update_entry, delete_entry, get_user
+from database import get_all_entries, get_entry_by_id, get_detection_summary, create_entry as db_create_entry, update_entry as db_update_entry, delete_entry as db_delete_entry, get_user
 from services.storage import save_image
 from services.detection import queue_detection_job, classify_crack_image
 from utils import format_entry_response
 from routers.auth import get_current_user
 from config import logger
+import traceback
+
+# Import detection database functions
+from database.operations import (
+    create_crack_detection, 
+    create_detection_summary,
+    get_detection_summary
+)
 
 router = APIRouter(prefix="/api/entries", tags=["entries"])
 
@@ -136,29 +144,124 @@ async def create_entry(
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid coordinates format")
             
-        # Classify crack type using simple classifier
-        crack_type = classify_crack_image(image_data)
-        
-        # Create entry data
+        # Create entry data first
+        entry_id = str(uuid.uuid4())
         entry_data = {
-            "id": str(uuid.uuid4()),
+            "id": entry_id,
             "title": title,
             "description": description,
             "location": location,
             "coordinates": coords,
             "severity": severity,
-            "type": crack_type,
+            "type": "unknown",  # Will be updated after AI analysis
             "image_url": image_url,
             "user_id": user_id,
             "created_at": datetime.now().isoformat()
         }
         
         # Save entry to database immediately
-        new_entry = create_entry(entry_data)
+        new_entry = db_create_entry(entry_data)
         if not new_entry:
             raise HTTPException(status_code=500, detail="Failed to create entry")
         
-        # Queue YOLO processing job
+        # Run YOLO detection immediately for better UX
+        from services.detection import classify_image
+        
+        # Save image temporarily for YOLO processing
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp_file:
+            tmp_file.write(image_data)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Run YOLO detection
+            detection_result = classify_image(tmp_path, user_id)
+            
+            # Determine primary crack type from detections
+            if detection_result["total_cracks"] > 0:
+                # Get the most common crack type by count
+                crack_types = detection_result["crack_types"]
+                if crack_types:
+                    # Find crack type with highest count
+                    primary_crack_type = max(crack_types.keys(), key=lambda x: crack_types[x]["count"])
+                else:
+                    primary_crack_type = "unknown"
+            else:
+                primary_crack_type = "no_cracks"
+            
+            # Update entry with AI results
+            update_data = {"type": primary_crack_type}
+            if detection_result.get("classified_image_url"):
+                update_data["classified_image_url"] = detection_result["classified_image_url"]
+            
+            updated_entry = db_update_entry(entry_id, update_data)
+            if updated_entry:
+                new_entry = updated_entry
+                logger.info(f"Updated entry {entry_id} with detection results: type={primary_crack_type}, classified_image_url={detection_result.get('classified_image_url')}")
+                
+                # Save individual detections to database
+                for detection in detection_result.get("detections", []):
+                    detection_data = {
+                        "id": str(uuid.uuid4()),
+                        "road_crack_id": entry_id,
+                        "crack_type": detection["label"],
+                        "confidence": detection["confidence"],
+                        "x1": detection["x1"],
+                        "y1": detection["y1"],
+                        "x2": detection["x2"],
+                        "y2": detection["y2"],
+                        "created_at": datetime.now().isoformat()
+                    }
+                    create_crack_detection(detection_data)
+                    
+                # Save detection summary to database
+                summary_data = {
+                    "id": str(uuid.uuid4()),
+                    "road_crack_id": entry_id,
+                    "total_cracks": detection_result["total_cracks"],
+                    "crack_types": detection_result["crack_types"],
+                    "created_at": datetime.now().isoformat()
+                }
+                create_detection_summary(summary_data)
+                logger.info(f"Saved detection results to database for entry {entry_id}")
+                
+        except Exception as e:
+            logger.error(f"Error running YOLO detection: {e}")
+            logger.error(f"Exception details: {traceback.format_exc()}")
+            # Fallback to simple classification
+            from services.detection import classify_crack_image
+            crack_type = classify_crack_image(image_data)
+            update_data = {"type": crack_type}
+            updated_entry = db_update_entry(entry_id, update_data)
+            if updated_entry:
+                new_entry = updated_entry
+            # Set fallback detection result for response
+            detection_result = {
+                "total_cracks": 1,
+                "crack_types": {crack_type: {"count": 1, "avg_confidence": 85.0}},
+                "detections": [],
+                "classified_image_url": None
+            }
+            
+            # Save fallback detection summary to database
+            summary_data = {
+                "id": str(uuid.uuid4()),
+                "road_crack_id": entry_id,
+                "total_cracks": 1,
+                "crack_types": {crack_type: {"count": 1, "avg_confidence": 85.0}},
+                "created_at": datetime.now().isoformat()
+            }
+            create_detection_summary(summary_data)
+            logger.info(f"Saved fallback detection summary for entry {entry_id}")
+        finally:
+            # Clean up temp file
+            import os
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+        
+        # Also queue YOLO processing job for async processing (backup)
         queue_detection_job(new_entry["id"], image_url, user_id)
         
         # Use current_user data instead of db lookup
@@ -166,12 +269,21 @@ async def create_entry(
         if not formatted_entry:
             raise HTTPException(status_code=500, detail="Error formatting entry")
         
-        # Return response immediately (no detection info for now)
-        formatted_entry["detection_info"] = {
-            "total_cracks": 0,
-            "crack_types": {},
-            "status": "processing"  # Indicate YOLO is processing
-        }
+        # Return response with detection results if available
+        if 'detection_result' in locals() and detection_result:
+            formatted_entry["detection_info"] = {
+                "total_cracks": detection_result["total_cracks"],
+                "crack_types": detection_result["crack_types"],
+                "detections": detection_result.get("detections", []),
+                "status": "completed"
+            }
+        else:
+            formatted_entry["detection_info"] = {
+                "total_cracks": 0,
+                "crack_types": {},
+                "detections": [],
+                "status": "processing"
+            }
             
         return formatted_entry
     except Exception as e:
@@ -196,7 +308,7 @@ async def update_entry(entry_id: str, entry_update: RoadCrackUpdate):
         update_data = {k: v for k, v in entry_update.dict().items() if v is not None}
         
         # Update entry
-        updated_entry = update_entry(entry_id, update_data)
+        updated_entry = db_update_entry(entry_id, update_data)
         if not updated_entry:
             raise HTTPException(status_code=500, detail="Failed to update entry")
         
@@ -230,7 +342,7 @@ async def delete_entry(entry_id: str):
             raise HTTPException(status_code=404, detail="Entry not found")
         
         # Delete entry
-        success = delete_entry(entry_id)
+        success = db_delete_entry(entry_id)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete entry")
         

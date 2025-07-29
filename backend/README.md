@@ -1,4 +1,4 @@
-# Dalan Backend Refactoring Plan
+# Dalan Backend - Serverless Architecture
 
 ## Project Overview
 
@@ -81,8 +81,8 @@ The current architecture includes:
 
 - [x] Define clear domain models for entries
 - [x] Implement validation rules for entries
-- [ ] Create domain models for users and detection
-- [ ] Create domain-specific exceptions
+- [x] Create domain models for users and detection
+- [x] Create domain-specific exceptions
 
 ### Phase 3: Repository Layer
 
@@ -93,25 +93,25 @@ The current architecture includes:
 
 ### Phase 4: Service Layer
 
-- [ ] Refactor detection service with better S3 integration
-- [ ] Optimize model loading and caching
-- [ ] Improve image processing pipeline
+- [x] Refactor detection service with better S3 integration
+- [x] Optimize model loading and caching
+- [x] Improve image processing pipeline
 
 ### Phase 5: API Layer
 
 - [x] Refactor entries routes into dedicated Lambda handlers
 - [x] Configure API Gateway endpoints for entries in serverless.yml
-- [ ] Refactor users routes into dedicated Lambda handlers
-- [ ] Refactor auth routes into dedicated Lambda handlers
-- [ ] Refactor detection routes into dedicated Lambda handlers
-- [ ] Implement proper dependency injection
-- [ ] Add comprehensive request validation
+- [x] Refactor users routes into dedicated Lambda handlers
+- [x] Refactor auth routes into dedicated Lambda handlers
+- [x] Refactor detection routes into dedicated Lambda handlers
+- [x] Implement proper dependency injection
+- [x] Add comprehensive request validation
 
 ### Phase 6: Serverless Configuration
 
-- [ ] Update serverless.yml with dedicated functions
-- [ ] Optimize Lambda configurations
-- [ ] Configure proper IAM permissions
+- [x] Update serverless.yml with dedicated functions
+- [x] Optimize Lambda configurations
+- [x] Configure proper IAM permissions
 
 ### Phase 7: Testing
 

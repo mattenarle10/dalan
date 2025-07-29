@@ -77,42 +77,10 @@ custom:
 
 # Functions
 functions:
-  # Main API function (legacy - will be gradually replaced by granular functions)
-  api:
-    handler: main.handler
-    events:
-      - http:
-          path: /{proxy+}
-          method: ANY
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: false
-      - http:
-          path: /
-          method: ANY
-          cors:
-            origin: '*'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: false
-    layers:
-      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1  # OpenCV layer
   
   # YOLO processing function (async)
   yoloProcessor:
-    handler: services.yolo_processor.handler
+    handler: handlers.detection.process.handler
     memorySize: 2048  # Higher memory for YOLO processing
     timeout: 300      # 5 minutes for processing
     events:
@@ -125,7 +93,49 @@ functions:
     layers:
       - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1
     
-  # Granular entry functions
+  # Auth handlers
+  login:
+    handler: handlers.auth.login.handler
+    events:
+      - http:
+          path: /auth/login
+          method: POST
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+          
+  verifyToken:
+    handler: handlers.auth.verify.handler
+    events:
+      - http:
+          path: /auth/verify
+          method: POST
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+  
+  # User handlers
+  getUser:
+    handler: handlers.users.get_user.handler
+    events:
+      - http:
+          path: /users/{user_id}
+          method: GET
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+          
+  updateUser:
+    handler: handlers.users.update_user.handler
+    events:
+      - http:
+          path: /users/{user_id}
+          method: PUT
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+  
+  # Entry handlers
   getEntries:
     handler: handlers.entries.get_entries.handler
     events:
@@ -206,8 +216,6 @@ plugins:
   - serverless-python-requirements
   - serverless-offline
 
-# Python requirements config
-
 # Package settings
 package:
   patterns:
@@ -221,3 +229,4 @@ package:
     - '!.DS_Store'
     - '!*.pyc'
     - '!*.pyo'
+    - '!backup/**'  # Exclude backup directory with old code

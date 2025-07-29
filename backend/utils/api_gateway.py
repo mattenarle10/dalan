@@ -242,3 +242,68 @@ def error_response(
         error_body["error"]["details"] = details
     
     return create_response(status_code=status_code, body=error_body)
+
+
+def parse_api_gateway_event(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Parse API Gateway event body
+    
+    Args:
+        event: API Gateway event
+        
+    Returns:
+        Parsed body or None if parsing failed
+    """
+    try:
+        # Get body from event
+        body = event.get('body')
+        if not body:
+            return None
+            
+        # Handle base64 encoding
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+            
+        # Parse JSON body
+        return json.loads(body)
+    except Exception as e:
+        logger.error(f"Error parsing API Gateway event body: {e}")
+        return None
+
+
+def create_api_gateway_response(status_code: int, body: Any) -> Dict[str, Any]:
+    """
+    Create API Gateway response with standard headers
+    
+    Args:
+        status_code: HTTP status code
+        body: Response body (will be JSON serialized)
+        
+    Returns:
+        API Gateway response
+    """
+    return {
+        'statusCode': status_code,
+        'headers': {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS,POST,PUT,DELETE',
+            'Access-Control-Allow-Headers': 'Origin,Accept,X-Requested-With,Content-Type,Access-Control-Request-Method,Access-Control-Request-Headers,Authorization'
+        },
+        'body': json.dumps(body)
+    }
+
+
+def create_error_response(status_code: int, message: str) -> Dict[str, Any]:
+    """
+    Create error response for API Gateway
+    
+    Args:
+        status_code: HTTP status code
+        message: Error message
+        
+    Returns:
+        API Gateway error response
+    """
+    return create_api_gateway_response(status_code, {'error': message})

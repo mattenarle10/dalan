@@ -73,21 +73,23 @@ The current architecture includes:
 
 ### Phase 1: Restructure Project Files
 
-- [ ] Create new directory structure
-- [ ] Move and refactor existing code into appropriate modules
-- [ ] Implement centralized configuration
+- [x] Create new directory structure
+- [x] Move and refactor existing code into appropriate modules
+- [x] Implement centralized configuration
 
 ### Phase 2: Domain Model Implementation
 
-- [ ] Define clear domain models using Pydantic
-- [ ] Implement validation rules
+- [x] Define clear domain models for entries
+- [x] Implement validation rules for entries
+- [ ] Create domain models for users and detection
 - [ ] Create domain-specific exceptions
 
 ### Phase 3: Repository Layer
 
-- [ ] Implement repository pattern for data access
-- [ ] Refactor Supabase operations into repositories
-- [ ] Add error handling and retries
+- [x] Implement repository pattern for data access
+- [x] Refactor Supabase operations into repositories for entries
+- [x] Create repositories for users and auth
+- [x] Add error handling and logging
 
 ### Phase 4: Service Layer
 
@@ -97,7 +99,11 @@ The current architecture includes:
 
 ### Phase 5: API Layer
 
-- [ ] Refactor routes into smaller, focused endpoints
+- [x] Refactor entries routes into dedicated Lambda handlers
+- [x] Configure API Gateway endpoints for entries in serverless.yml
+- [ ] Refactor users routes into dedicated Lambda handlers
+- [ ] Refactor auth routes into dedicated Lambda handlers
+- [ ] Refactor detection routes into dedicated Lambda handlers
 - [ ] Implement proper dependency injection
 - [ ] Add comprehensive request validation
 

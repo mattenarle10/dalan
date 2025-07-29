@@ -1,13 +1,12 @@
 import os
 from dotenv import load_dotenv
-import logging
+from utils.logger import setup_logger
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure logger
+logger = setup_logger("dalan")
 
 # API Configuration
 API_TITLE = "Dalan API"

@@ -77,7 +77,7 @@ custom:
 
 # Functions
 functions:
-  # Main API function
+  # Main API function (legacy - will be gradually replaced by granular functions)
   api:
     handler: main.handler
     events:
@@ -124,6 +124,61 @@ functions:
           batchSize: 1
     layers:
       - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1
+    
+  # Granular entry functions
+  getEntries:
+    handler: handlers.entries.get_entries.handler
+    events:
+      - http:
+          path: /entries
+          method: GET
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+          
+  getEntry:
+    handler: handlers.entries.get_entry.handler
+    events:
+      - http:
+          path: /entries/{id}
+          method: GET
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+          
+  createEntry:
+    handler: handlers.entries.create_entry.handler
+    events:
+      - http:
+          path: /entries
+          method: POST
+          cors: true
+    layers:
+      - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p39-opencv-python:1  # OpenCV layer
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+    memorySize: 1024  # Increased for image processing
+    timeout: 30       # Increased timeout for image processing
+          
+  updateEntry:
+    handler: handlers.entries.update_entry.handler
+    events:
+      - http:
+          path: /entries/{id}
+          method: PUT
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
+          
+  deleteEntry:
+    handler: handlers.entries.delete_entry.handler
+    events:
+      - http:
+          path: /entries/{id}
+          method: DELETE
+          cors: true
+    environment:
+      API_GATEWAY_STAGE: ${self:provider.stage}
 
 # Resources
 resources:
